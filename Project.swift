@@ -9,7 +9,6 @@ let project = Project(
             "SWIFT_VERSION": "6.0",
             "SWIFT_STRICT_CONCURRENCY": "complete",
             "CODE_SIGN_STYLE": "Automatic",
-            "CODE_SIGN_IDENTITY": "Apple Development",
         ],
     ),
     targets: [
