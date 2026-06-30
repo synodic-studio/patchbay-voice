@@ -26,6 +26,7 @@ platform :ios do
 
   desc "Build and upload a new beta to TestFlight"
   lane :beta do
+    sh("security unlock-keychain -p \"$(pass show mac-login-password)\" ~/Library/Keychains/login.keychain-db")
     sh("cd .. && tuist generate --no-open")
 
     api_key = app_store_connect_api_key(
