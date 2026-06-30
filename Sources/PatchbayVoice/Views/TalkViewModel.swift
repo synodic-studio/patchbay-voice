@@ -23,7 +23,8 @@ final class TalkViewModel {
         defer { isProcessing = false }
         do {
             let audio = try Data(contentsOf: fileURL)
-            let response = try await client.sendTurn(chatID: chat.id, audioData: audio)
+            let model = UserDefaults.standard.string(forKey: "selectedModelAlias") ?? "small"
+            let response = try await client.sendTurn(chatID: chat.id, audioData: audio, model: model)
             transcript = response.transcript
             reply = response.reply
             if let path = response.audioURL {

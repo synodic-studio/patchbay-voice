@@ -19,6 +19,7 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
+                ModelSectionView()
                 Section {
                     Text("Version \(version)")
                         .foregroundStyle(.secondary)
