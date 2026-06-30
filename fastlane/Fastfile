@@ -1,34 +1,66 @@
 default_platform(:ios)
 
-ASC_KEY_ID      = "REDACTED-ASC-KEY-ID"
-ASC_ISSUER_ID   = "REDACTED-ASC-ISSUER-ID"
-ASC_KEY_PATH    = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_REDACTED-ASC-KEY-ID.p8")
+ASC_KEY_ID    = "REDACTED-ASC-KEY-ID"
+ASC_ISSUER_ID = "REDACTED-ASC-ISSUER-ID"
+ASC_KEY_PATH  = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_REDACTED-ASC-KEY-ID.p8")
 
 platform :ios do
+  desc "Upload the already-built IPA to TestFlight (skips build)"
+  lane :upload do
+    api_key = app_store_connect_api_key(
+      key_id: ASC_KEY_ID,
+      issuer_id: ASC_ISSUER_ID,
+      key_filepath: ASC_KEY_PATH,
+      duration: 1200,
+      in_house: false,
+    )
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: "build/fastlane/PatchbayVoice.ipa",
+      skip_waiting_for_build_processing: false,
+      skip_submission: true,
+      distribute_external: false,
+      notify_external_testers: false,
+    )
+  end
+
   desc "Build and upload a new beta to TestFlight"
   lane :beta do
-    # Tuist generates the .xcodeproj before building
     sh("cd .. && tuist generate --no-open")
-
-    build_app(
-      scheme: "PatchbayVoice",
-      configuration: "Release",
-      export_method: "app-store",
-      output_directory: "/tmp/pbv-export",
-      output_name: "PatchbayVoice",
-      silent: false,
-      clean: true
-    )
 
     api_key = app_store_connect_api_key(
       key_id: ASC_KEY_ID,
       issuer_id: ASC_ISSUER_ID,
-      key_filepath: ASC_KEY_PATH
+      key_filepath: ASC_KEY_PATH,
+      duration: 1200,
+      in_house: false,
+    )
+
+    build_app(
+      workspace: "PatchbayVoice.xcworkspace",
+      scheme: "PatchbayVoice",
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true,
+      output_directory: "build/fastlane",
+      output_name: "PatchbayVoice.ipa",
+      include_bitcode: false,
+      include_symbols: true,
+      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=CX9A4TZM67",
+      export_options: {
+        method: "app-store",
+        signingStyle: "automatic",
+        teamID: "CX9A4TZM67",
+      },
     )
 
     upload_to_testflight(
       api_key: api_key,
-      skip_waiting_for_build_processing: true
+      ipa: "build/fastlane/PatchbayVoice.ipa",
+      skip_waiting_for_build_processing: false,
+      skip_submission: true,
+      distribute_external: false,
+      notify_external_testers: false,
     )
   end
 end
