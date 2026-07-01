@@ -1,11 +1,16 @@
 import Foundation
 import Observation
 
+struct TurnItem: Identifiable {
+    let id = UUID()
+    let transcript: String
+    let reply: String
+}
+
 @MainActor
 @Observable
 final class TalkViewModel {
-    var transcript = ""
-    var reply = ""
+    var turns: [TurnItem] = []
     var isProcessing = false
     var errorMessage: String?
     var pendingText: String?
@@ -16,6 +21,12 @@ final class TalkViewModel {
     private(set) var lastAudioChunks: [Data] = []
 
     var hasReplayable: Bool { !lastAudioChunks.isEmpty }
+
+    func clearHistory() {
+        turns.removeAll()
+        lastAudioChunks = []
+        player.stop()
+    }
 
     func startRecording() {
         try? AudioSessionManager.configure()
@@ -51,8 +62,7 @@ final class TalkViewModel {
         isProcessing = true
         do {
             let response = try await client.sendTurn(chatID: chat.id, audioData: audio, settings: .current)
-            transcript = response.transcript
-            reply = response.reply
+            turns.append(TurnItem(transcript: response.transcript, reply: response.reply))
             await _playResponse(response, client: client)
         } catch {
             errorMessage = error.localizedDescription
@@ -65,8 +75,7 @@ final class TalkViewModel {
         isProcessing = true
         do {
             let response = try await client.sendTextTurn(chatID: chat.id, text: text, settings: .current)
-            transcript = ""
-            reply = response.reply
+            turns.append(TurnItem(transcript: "", reply: response.reply))
             await _playResponse(response, client: client)
         } catch {
             errorMessage = error.localizedDescription

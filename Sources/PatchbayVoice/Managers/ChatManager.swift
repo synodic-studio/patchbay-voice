@@ -8,6 +8,7 @@ final class ChatManager {
     var currentChatID: String?
     var projects: [String] = []
     var errorMessage: String?
+    var lastResetToken: UUID?
 
     var currentChat: Chat? { chats.first { $0.id == currentChatID } }
 
@@ -52,6 +53,7 @@ final class ChatManager {
         do {
             let updated = try await client.resetChat(id: id)
             if let idx = chats.firstIndex(where: { $0.id == id }) { chats[idx] = updated }
+            lastResetToken = UUID()
         } catch {
             errorMessage = error.localizedDescription
         }

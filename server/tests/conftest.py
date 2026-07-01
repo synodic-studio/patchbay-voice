@@ -21,6 +21,7 @@ def tmp_dev(tmp_path):
 def client(tmp_dev):
     """FastAPI TestClient with isolated state — no real disk I/O, no pass calls."""
     import chats as chats_mod
+    import routes.misc as misc_mod
     import routes.talk as talk_mod
 
     chats_mod._chats.clear()
@@ -29,6 +30,7 @@ def client(tmp_dev):
         patch.object(chats_mod, "DEVELOPER_DIR", tmp_dev),
         patch.object(chats_mod, "CHATS_FILE", tmp_dev / "chats.json"),
         patch.object(talk_mod, "DEVELOPER_DIR", tmp_dev),
+        patch.object(misc_mod, "DEVELOPER_DIR", tmp_dev),
         patch("chats.save_chats", lambda: None),
     ):
         from app import app

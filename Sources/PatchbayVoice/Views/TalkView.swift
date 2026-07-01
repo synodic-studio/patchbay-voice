@@ -11,8 +11,7 @@ struct TalkView: View {
     var body: some View {
         VStack(spacing: 20) {
             chatHeader
-            responseScroll
-            statusRow
+            historyScroll
             if showTextInput {
                 inputBar
             } else {
@@ -21,6 +20,8 @@ struct TalkView: View {
             controlRow
         }
         .padding()
+        .onChange(of: chatManager.currentChatID) { vm.clearHistory() }
+        .onChange(of: chatManager.lastResetToken) { vm.clearHistory() }
         .alert("Error", isPresented: .constant(vm.errorMessage != nil)) {
             Button("OK") { vm.errorMessage = nil }
         } message: {
@@ -35,30 +36,61 @@ struct TalkView: View {
         .font(.headline)
     }
 
-    private var responseScroll: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if !vm.transcript.isEmpty {
-                    Text(vm.transcript).foregroundStyle(.secondary).italic()
+    private var historyScroll: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if vm.turns.isEmpty && !vm.isProcessing {
+                        Text("Hold to talk or type below")
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 40)
+                    }
+                    ForEach(vm.turns) { turn in
+                        turnRow(turn)
+                            .padding(.bottom, 12)
+                    }
+                    if vm.isProcessing {
+                        HStack {
+                            ProgressView()
+                            Text("Thinking…")
+                                .foregroundStyle(.secondary)
+                                .font(.callout)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 8)
+                        .id("spinner")
+                    }
+                    if vm.pendingText != nil || vm.pendingAudioData != nil {
+                        Text("1 message queued")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                if !vm.reply.isEmpty {
-                    Text(vm.reply)
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(.default, value: vm.turns.count)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .onChange(of: vm.turns.count) {
+                withAnimation { proxy.scrollTo("spinner", anchor: .bottom) }
+            }
+            .onChange(of: vm.isProcessing) { processing in
+                if processing { withAnimation { proxy.scrollTo("spinner", anchor: .bottom) } }
+            }
         }
     }
 
-    private var statusRow: some View {
-        Group {
-            if vm.isProcessing {
-                ProgressView("Thinking…")
-            } else if vm.pendingText != nil || vm.pendingAudioData != nil {
-                Text("1 message queued")
-                    .font(.caption)
+    @ViewBuilder
+    private func turnRow(_ turn: TurnItem) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if !turn.transcript.isEmpty {
+                Text(turn.transcript)
                     .foregroundStyle(.secondary)
+                    .italic()
+                    .font(.callout)
             }
+            Text(turn.reply)
         }
+        Divider()
     }
 
     private var inputBar: some View {
@@ -84,36 +116,35 @@ struct TalkView: View {
     }
 
     private var controlRow: some View {
-        HStack(spacing: 24) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showTextInput.toggle()
+        HStack(spacing: 20) {
+            replayControl
+            Spacer()
+            VStack(alignment: .trailing, spacing: 6) {
+                Toggle(isOn: $showTextInput) {
+                    Label(showTextInput ? "Voice" : "Text", systemImage: showTextInput ? "mic" : "keyboard")
+                        .font(.caption)
                 }
-            } label: {
-                Image(systemName: showTextInput ? "mic.fill" : "keyboard")
-                    .font(.title3)
+                .toggleStyle(.switch)
+                .onChange(of: showTextInput) { if !$1 { textInput = "" } }
+
+                Toggle("Audio response", isOn: $audioResponseEnabled)
+                    .toggleStyle(.switch)
+                    .font(.caption)
+            }
+        }
+    }
+
+    @ViewBuilder private var replayControl: some View {
+        if vm.player.isPlaying {
+            Button { vm.player.stop() } label: {
+                Image(systemName: "stop.fill").font(.title3)
             }
             .buttonStyle(.plain)
-
-            if vm.player.isPlaying {
-                Button { vm.player.stop() } label: {
-                    Image(systemName: "stop.fill")
-                        .font(.title3)
-                }
-                .buttonStyle(.plain)
-            } else if vm.hasReplayable {
-                Button { vm.replay() } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.title3)
-                }
-                .buttonStyle(.plain)
+        } else if vm.hasReplayable {
+            Button { vm.replay() } label: {
+                Image(systemName: "arrow.counterclockwise").font(.title3)
             }
-
-            Spacer()
-
-            Toggle("Audio", isOn: $audioResponseEnabled)
-                .toggleStyle(.switch)
-                .font(.caption)
+            .buttonStyle(.plain)
         }
     }
 
