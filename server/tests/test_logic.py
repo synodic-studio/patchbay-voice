@@ -1,0 +1,215 @@
+"""Unit tests for pure logic functions — no I/O, no mocking."""
+
+from __future__ import annotations
+
+import json
+from unittest.mock import patch
+
+import pytest
+
+
+# ── tts._split_sentences ──────────────────────────────────────────────────
+
+
+class TestSplitSentences:
+    def test_single_sentence(self):
+        from tts import _split_sentences
+
+        assert _split_sentences("Hello world.") == ["Hello world."]
+
+    def test_splits_long_text(self):
+        from tts import _split_sentences
+
+        # Each sentence is long enough that merging would exceed the 120-char threshold
+        s1 = "The system has finished processing your request and the results are now available."
+        s2 = "You can review the full output by navigating to the reports section of the dashboard."
+        result = _split_sentences(f"{s1} {s2}")
+        assert len(result) == 2
+        assert all(s.strip() for s in result)
+
+    def test_merges_short_fragments(self):
+        from tts import _split_sentences
+
+        # Short sentences stay merged — avoids tiny audio chunks with bad prosody
+        result = _split_sentences("Really? Yes! Exactly.")
+        assert len(result) == 1
+
+    def test_empty_string(self):
+        from tts import _split_sentences
+
+        assert _split_sentences("") == [""]
+
+    def test_no_trailing_split(self):
+        from tts import _split_sentences
+
+        result = _split_sentences("Done.")
+        assert result == ["Done."]
+
+
+# ── pi_runner event parsing ───────────────────────────────────────────────
+
+
+class TestParseEvents:
+    def test_valid_ndjson(self):
+        from pi_runner import _parse_events
+
+        line = json.dumps({"type": "session", "id": "abc"})
+        assert _parse_events(line) == [{"type": "session", "id": "abc"}]
+
+    def test_skips_invalid_json(self):
+        from pi_runner import _parse_events
+
+        events = _parse_events('not json\n{"type": "session"}')
+        assert events == [{"type": "session"}]
+
+    def test_skips_non_dict(self):
+        from pi_runner import _parse_events
+
+        assert _parse_events("[1, 2, 3]") == []
+
+    def test_multiple_lines(self):
+        from pi_runner import _parse_events
+
+        lines = "\n".join(
+            [
+                json.dumps({"type": "session", "id": "x"}),
+                json.dumps({"type": "agent_start"}),
+            ]
+        )
+        assert len(_parse_events(lines)) == 2
+
+
+class TestFindSessionId:
+    def test_found(self):
+        from pi_runner import _find_session_id
+
+        assert _find_session_id([{"type": "session", "id": "abc-123"}]) == "abc-123"
+
+    def test_not_found(self):
+        from pi_runner import _find_session_id
+
+        assert _find_session_id([{"type": "agent_start"}]) is None
+
+    def test_empty(self):
+        from pi_runner import _find_session_id
+
+        assert _find_session_id([]) is None
+
+    def test_id_must_be_string(self):
+        from pi_runner import _find_session_id
+
+        assert _find_session_id([{"type": "session", "id": 123}]) is None
+
+
+class TestExtractText:
+    def test_extracts_assistant_text(self):
+        from pi_runner import _extract_text
+
+        events = [
+            {
+                "type": "agent_end",
+                "messages": [
+                    {"role": "assistant", "content": [{"text": "Hello there."}]},
+                ],
+            }
+        ]
+        assert _extract_text(events) == "Hello there."
+
+    def test_empty_events(self):
+        from pi_runner import _extract_text
+
+        assert _extract_text([]) == ""
+
+    def test_uses_last_agent_end(self):
+        from pi_runner import _extract_text
+
+        events = [
+            {"type": "agent_end", "messages": [{"role": "assistant", "content": [{"text": "first"}]}]},
+            {"type": "agent_end", "messages": [{"role": "assistant", "content": [{"text": "last"}]}]},
+        ]
+        assert _extract_text(events) == "last"
+
+    def test_skips_non_assistant_messages(self):
+        from pi_runner import _extract_text
+
+        events = [
+            {
+                "type": "agent_end",
+                "messages": [
+                    {"role": "user", "content": [{"text": "ignored"}]},
+                    {"role": "assistant", "content": [{"text": "kept"}]},
+                ],
+            }
+        ]
+        assert _extract_text(events) == "kept"
+
+
+class TestFindError:
+    def test_finds_error(self):
+        from pi_runner import _find_error
+
+        events = [{"type": "message", "stopReason": "error", "errorMessage": "oops"}]
+        assert _find_error(events) == "oops"
+
+    def test_no_error(self):
+        from pi_runner import _find_error
+
+        assert _find_error([{"type": "session", "id": "x"}]) is None
+
+    def test_fallback_message(self):
+        from pi_runner import _find_error
+
+        events = [{"type": "message", "stopReason": "error"}]
+        assert _find_error(events) == "unknown pi error"
+
+
+# ── routes.talk helpers ───────────────────────────────────────────────────
+
+
+class TestTruthy:
+    def test_true_values(self):
+        from routes.talk import _truthy
+
+        for v in ("true", "True", "1", "yes", "YES"):
+            assert _truthy(v), f"Expected truthy: {v!r}"
+
+    def test_false_values(self):
+        from routes.talk import _truthy
+
+        for v in ("false", "False", "0", "no", ""):
+            assert not _truthy(v), f"Expected falsy: {v!r}"
+
+
+# ── chats.create_chat validation ──────────────────────────────────────────
+
+
+class TestCreateChat:
+    def test_rejects_absolute_path(self, tmp_path):
+        from chats import create_chat
+
+        with patch("chats.DEVELOPER_DIR", tmp_path):
+            with pytest.raises(ValueError):
+                create_chat("/etc/passwd")
+
+    def test_rejects_parent_traversal(self, tmp_path):
+        from chats import create_chat
+
+        with patch("chats.DEVELOPER_DIR", tmp_path):
+            with pytest.raises(ValueError):
+                create_chat("../outside")
+
+    def test_rejects_nonexistent_dir(self, tmp_path):
+        from chats import create_chat
+
+        with patch("chats.DEVELOPER_DIR", tmp_path):
+            with pytest.raises(ValueError):
+                create_chat("doesnotexist")
+
+    def test_valid_dir(self, tmp_path):
+        from chats import create_chat
+
+        (tmp_path / "myproject").mkdir()
+        with patch("chats.DEVELOPER_DIR", tmp_path), patch("chats.save_chats", lambda: None):
+            chat = create_chat("myproject")
+        assert chat.project_dir == "myproject"
+        assert chat.id
