@@ -65,7 +65,7 @@ platform :ios do
     )
 
     asc_script = File.expand_path(
-      "~/.claude/plugins/cache/synodic-kit/synodic-kit/784f1c68a326/skills/testflight-ship/scripts/asc.py",
+      "~/.claude/plugins/cache/synodic-kit/synodic-kit/df53c3e5f437/skills/testflight-ship/scripts/asc.py",
     )
     app_id = "6785742336"
     # Internal Testers group has hasAccessToAllBuilds=False — must be explicitly linked
