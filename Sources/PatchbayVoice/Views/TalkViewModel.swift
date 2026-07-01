@@ -75,7 +75,7 @@ final class TalkViewModel {
         isProcessing = true
         do {
             let response = try await client.sendTextTurn(chatID: chat.id, text: text, settings: .current)
-            turns.append(TurnItem(transcript: "", reply: response.reply))
+            turns.append(TurnItem(transcript: text, reply: response.reply))
             await _playResponse(response, client: client)
         } catch {
             errorMessage = error.localizedDescription

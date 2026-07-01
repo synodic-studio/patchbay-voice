@@ -116,21 +116,24 @@ struct TalkView: View {
     }
 
     private var controlRow: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) {
             replayControl
             Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                Toggle(isOn: $showTextInput) {
-                    Label(showTextInput ? "Voice" : "Text", systemImage: showTextInput ? "mic" : "keyboard")
-                        .font(.caption)
-                }
-                .toggleStyle(.switch)
-                .onChange(of: showTextInput) { if !$1 { textInput = "" } }
-
-                Toggle("Audio response", isOn: $audioResponseEnabled)
-                    .toggleStyle(.switch)
-                    .font(.caption)
+            Picker("Input mode", selection: $showTextInput) {
+                Label("Voice", systemImage: "mic").tag(false)
+                Label("Text", systemImage: "keyboard").tag(true)
             }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .onChange(of: showTextInput) { if !$1 { textInput = "" } }
+            Button {
+                audioResponseEnabled.toggle()
+            } label: {
+                Image(systemName: audioResponseEnabled ? "speaker.wave.2" : "speaker.slash")
+                    .font(.title3)
+                    .foregroundStyle(audioResponseEnabled ? .primary : .tertiary)
+            }
+            .buttonStyle(.plain)
         }
     }
 

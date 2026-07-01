@@ -9,6 +9,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "httpx>=0.28.0",
     "google-auth>=2.40.0",
+    "requests>=2.32.0",
 ]
 
 [dependency-groups]
