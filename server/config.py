@@ -29,6 +29,8 @@ DEVELOPER_DIR = Path(environ.get("DEVELOPER_DIR", "~/Developer")).expanduser()
 CHATS_FILE = Path(environ.get("CHATS_FILE", "~/.voice-demo-chats.json").strip()).expanduser()
 
 TTS_VOICE = environ.get("TTS_VOICE", "Samantha")
+GOOGLE_TTS_API_KEY = environ.get("GOOGLE_TTS_API_KEY", "")
+GOOGLE_TTS_VOICE = environ.get("GOOGLE_TTS_VOICE", "en-US-Chirp3-HD-Schedar")
 
 SYSTEM_PROMPT = (
     "You are a voice coding assistant accessed from a mobile phone. The user speaks to you "

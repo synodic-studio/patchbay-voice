@@ -51,12 +51,15 @@ def _find_error(events: list[dict]) -> str | None:
     return None
 
 
-async def run_pi(user_text: str, chat: Chat) -> str:
+async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/") -> str:
     cwd = str(DEVELOPER_DIR / chat.project_dir)
     # pi doesn't support -- terminator; guard against flag-like input from ASR
     safe_text = (" " + user_text) if user_text.startswith("-") else user_text
 
     def _run() -> tuple[str, str, int]:
+        import os
+
+        env = {**os.environ, "VOICE_SAVE_PATH": save_path}
         cmd = [
             PI_BIN,
             "-p",  # --print: non-interactive, process prompt and exit
@@ -75,7 +78,7 @@ async def run_pi(user_text: str, chat: Chat) -> str:
         cmd.append(safe_text)
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=PI_TIMEOUT)
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env, timeout=PI_TIMEOUT)
             return result.stdout, result.stderr, result.returncode
         except subprocess.TimeoutExpired:
             print(f"[pi] timeout after {PI_TIMEOUT}s chat={chat.id}", file=sys.stderr)
