@@ -3,9 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("serverURL") private var serverURL = "http://localhost:8800"
-    @AppStorage("audioResponseEnabled") private var audioResponseEnabled = true
     @AppStorage("ttsProvider") private var ttsProvider = "say"
-    @AppStorage("chunkedAudioEnabled") private var chunkedAudioEnabled = false
     @AppStorage("defaultSavePath") private var defaultSavePath = "docs/patchbay/"
     @AppStorage("createAgentsMD") private var createAgentsMD = false
     @AppStorage("createClaudeMD") private var createClaudeMD = false
@@ -22,7 +20,7 @@ struct SettingsView: View {
             Form {
                 serverSection
                 ModelSectionView()
-                audioSection
+                ttsSection
                 savePathSection
                 agentContextSection
                 Section {
@@ -47,15 +45,11 @@ struct SettingsView: View {
         }
     }
 
-    private var audioSection: some View {
-        Section("Audio") {
-            Toggle("Audio responses", isOn: $audioResponseEnabled)
-            if audioResponseEnabled {
-                Picker("TTS Provider", selection: $ttsProvider) {
-                    Text("macOS Say").tag("say")
-                    Text("Google Cloud").tag("google")
-                }
-                Toggle("Chunked audio (lower latency)", isOn: $chunkedAudioEnabled)
+    private var ttsSection: some View {
+        Section("Text-to-Speech") {
+            Picker("TTS Provider", selection: $ttsProvider) {
+                Text("macOS Say").tag("say")
+                Text("Google Cloud").tag("google")
             }
         }
     }

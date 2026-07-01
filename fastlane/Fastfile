@@ -68,7 +68,10 @@ platform :ios do
       "~/.claude/plugins/cache/synodic-kit/synodic-kit/784f1c68a326/skills/testflight-ship/scripts/asc.py",
     )
     app_id = "6785742336"
+    # Internal Testers group has hasAccessToAllBuilds=False — must be explicitly linked
+    internal_testers_group_id = "9edf449a-cf4c-4cfb-b506-33348c2eb601"
     sh("uv tool run --from authlib --with httpx python3 #{asc_script} auto-notify --app-id #{app_id}")
+    sh("uv tool run --from authlib --with httpx python3 #{asc_script} add-build-to-group --app-id #{app_id} --group-id #{internal_testers_group_id}")
     sh("uv tool run --from authlib --with httpx python3 #{asc_script} ensure-invited --app-id #{app_id}")
   end
 

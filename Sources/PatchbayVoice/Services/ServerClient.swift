@@ -82,7 +82,7 @@ struct ServerClient {
         field(into: &body, boundary: boundary, name: "chat_id", value: chatID)
         field(into: &body, boundary: boundary, name: "model", value: settings.model)
         field(into: &body, boundary: boundary, name: "audio_response", value: settings.audioResponse ? "true" : "false")
-        field(into: &body, boundary: boundary, name: "chunked_audio", value: settings.chunkedAudio ? "true" : "false")
+        field(into: &body, boundary: boundary, name: "chunked_audio", value: "true")
         if let sp = settings.savePath { field(into: &body, boundary: boundary, name: "save_path", value: sp) }
         if let tp = settings.ttsProvider { field(into: &body, boundary: boundary, name: "tts_provider", value: tp) }
         if settings.autoCommit { field(into: &body, boundary: boundary, name: "auto_commit", value: "true") }

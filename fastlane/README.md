@@ -31,6 +31,14 @@ Upload the already-built IPA to TestFlight (skips build)
 
 Build and upload a new beta to TestFlight
 
+### ios bump_build
+
+```sh
+[bundle exec] fastlane ios bump_build
+```
+
+Increment CURRENT_PROJECT_VERSION in Project.swift
+
 ----
 
 This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.

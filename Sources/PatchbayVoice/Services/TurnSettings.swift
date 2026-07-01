@@ -8,7 +8,6 @@ struct TurnSettings {
     let autoCommit: Bool
     let createAgentsMD: Bool
     let createClaudeMD: Bool
-    let chunkedAudio: Bool
 
     static var current: TurnSettings {
         let ud = UserDefaults.standard
@@ -23,7 +22,6 @@ struct TurnSettings {
             autoCommit: ud.bool(forKey: "autoCommitEnabled"),
             createAgentsMD: ud.bool(forKey: "createAgentsMD"),
             createClaudeMD: ud.bool(forKey: "createClaudeMD"),
-            chunkedAudio: ud.bool(forKey: "chunkedAudioEnabled"),
         )
     }
 }
