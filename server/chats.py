@@ -24,12 +24,17 @@ _chats: dict[str, Chat] = {}
 
 
 def load_chats() -> None:
-    global _chats
+    # Update in-place — never rebind _chats. Route modules capture a reference
+    # to this dict at import time; reassigning would leave them pointing at the
+    # old empty dict while new chats are added to the new one.
+    _chats.clear()
     if not CHATS_FILE.exists():
         return
     try:
         raw = json.loads(CHATS_FILE.read_text())
-        _chats = {k: Chat(**{f: c.get(f) for f in Chat.__dataclass_fields__}) for k, c in raw.get("chats", {}).items()}
+        _chats.update(
+            {k: Chat(**{f: c.get(f) for f in Chat.__dataclass_fields__}) for k, c in raw.get("chats", {}).items()}
+        )
     except Exception as exc:
         print(f"[chats] load failed: {exc}", file=sys.stderr)
 

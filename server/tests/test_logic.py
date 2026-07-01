@@ -296,3 +296,61 @@ class TestPiBinRuntime:
         if result.returncode == 0:
             pytest.skip("pi works even with bare PATH (node must be in a system location)")
         assert result.returncode != 0, "expected failure without Homebrew in PATH"
+
+
+# ── load_chats in-place mutation test ────────────────────────────────────────
+
+
+class TestLoadChatsInPlace:
+    """Regression for the production-only bug where load_chats() rebinds _chats
+    but route modules that did `from chats import _chats` still hold the old ref."""
+
+    def test_load_chats_does_not_rebind_reference(self, tmp_path):
+        import json
+
+        import chats as chats_mod
+
+        # Capture the identity of the dict BEFORE load_chats is called
+        original_id = id(chats_mod._chats)
+        ref_before = chats_mod._chats  # simulates what route modules do
+
+        chats_file = tmp_path / "chats.json"
+        chats_file.write_text(json.dumps({"chats": {}}))
+
+        from unittest.mock import patch
+
+        with patch.object(chats_mod, "CHATS_FILE", chats_file):
+            chats_mod.load_chats()
+
+        # Dict must be the same object — route modules still see the same ref
+        assert id(chats_mod._chats) == original_id, (
+            "load_chats() rebound _chats to a new object — "
+            "route modules with `from chats import _chats` will see the OLD empty dict"
+        )
+        assert chats_mod._chats is ref_before
+
+    def test_chats_loaded_from_disk_visible_via_captured_reference(self, tmp_path):
+        """After load_chats(), a reference captured before the call sees the new chats."""
+        import json
+        from dataclasses import asdict
+
+        import chats as chats_mod
+
+        # Simulate a chat on disk
+        existing = chats_mod.Chat(id="abc123", name="test", project_dir="test")
+        chats_file = tmp_path / "chats.json"
+        chats_file.write_text(json.dumps({"chats": {"abc123": asdict(existing)}}))
+
+        # Capture reference before calling load_chats (what routes do at import time)
+        ref = chats_mod._chats
+
+        from unittest.mock import patch
+
+        with patch.object(chats_mod, "CHATS_FILE", chats_file):
+            chats_mod.load_chats()
+
+        # The captured reference must see the loaded chat
+        assert "abc123" in ref, (
+            "Captured reference doesn't see loaded chats — "
+            "load_chats() likely rebound _chats instead of updating in-place"
+        )
