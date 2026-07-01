@@ -59,7 +59,12 @@ async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/
     def _run() -> tuple[str, str, int]:
         import os
 
-        env = {**os.environ, "VOICE_SAVE_PATH": save_path}
+        # Launchd gives us PATH=/usr/bin:/bin only. pi is a Node script so
+        # `env node` must find node — prepend Homebrew and local bin.
+        existing_path = os.environ.get("PATH", "")
+        extra = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin"
+        augmented_path = f"{extra}:{existing_path}" if existing_path else extra
+        env = {**os.environ, "VOICE_SAVE_PATH": save_path, "PATH": augmented_path}
         cmd = [
             PI_BIN,
             "-p",  # --print: non-interactive, process prompt and exit

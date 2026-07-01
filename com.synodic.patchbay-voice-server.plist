@@ -24,6 +24,8 @@
     <dict>
         <key>PI_BIN</key>
         <string>/opt/homebrew/bin/pi</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

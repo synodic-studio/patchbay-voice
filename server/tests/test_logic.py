@@ -213,3 +213,86 @@ class TestCreateChat:
             chat = create_chat("myproject")
         assert chat.project_dir == "myproject"
         assert chat.id
+
+
+# ── PI_BIN runtime checks ─────────────────────────────────────────────────────
+
+
+class TestPiBinRuntime:
+    """These tests exercise the real pi binary — they fail if pi is missing or
+    if the subprocess PATH is wrong (the launchd exit-127 failure mode)."""
+
+    def test_pi_bin_is_not_none(self):
+        from config import PI_BIN
+
+        assert PI_BIN is not None, "PI_BIN is None — pi not found via shutil.which"
+
+    def test_pi_bin_is_executable(self):
+        import os
+
+        from config import PI_BIN
+
+        assert PI_BIN is not None
+        assert os.path.isfile(PI_BIN), f"PI_BIN path does not exist: {PI_BIN}"
+        assert os.access(PI_BIN, os.X_OK), f"PI_BIN is not executable: {PI_BIN}"
+
+    def test_pi_bin_runs_with_augmented_path(self):
+        """Verify that pi can actually execute with the PATH the server injects.
+
+        This is the exact failure mode that caused exit code 127 in production:
+        pi is a Node script (`#!/usr/bin/env node`) and the launchd PATH
+        didn't include /opt/homebrew/bin so `env node` couldn't find node.
+        """
+        import os
+        import subprocess
+
+        from config import PI_BIN
+
+        assert PI_BIN is not None
+        existing_path = os.environ.get("PATH", "")
+        extra = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin"
+        augmented_path = f"{extra}:{existing_path}" if existing_path else extra
+        env = {**os.environ, "PATH": augmented_path}
+
+        # pi --help exits 0 and writes to stdout without needing a project
+        result = subprocess.run(
+            [PI_BIN, "--help"],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=15,
+        )
+        assert result.returncode == 0, (
+            f"pi exited {result.returncode} with augmented PATH.\n"
+            f"stderr: {result.stderr[:500]}\n"
+            f"This is the exit-127 bug: node not in PATH={augmented_path!r}"
+        )
+
+    def test_pi_bin_exits_nonzero_without_augmented_path(self):
+        """Document the failure: pi exits 127 without Homebrew in PATH.
+
+        This test is informational — it confirms the bug existed and the fix
+        is necessary. If this test starts PASSING (pi works even with a bare
+        PATH), the path augmentation in pi_runner.py is still harmless.
+        """
+        import os
+        import subprocess
+
+        from config import PI_BIN
+
+        if PI_BIN is None:
+            pytest.skip("PI_BIN not set")
+
+        bare_path = "/usr/bin:/bin:/usr/sbin:/sbin"
+        env = {**os.environ, "PATH": bare_path}
+        result = subprocess.run(
+            [PI_BIN, "--help"],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=15,
+        )
+        # 127 = node not found, 1 = some other error — either way not 0
+        if result.returncode == 0:
+            pytest.skip("pi works even with bare PATH (node must be in a system location)")
+        assert result.returncode != 0, "expected failure without Homebrew in PATH"
