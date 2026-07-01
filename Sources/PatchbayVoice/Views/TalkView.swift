@@ -20,8 +20,12 @@ struct TalkView: View {
             controlRow
         }
         .padding()
-        .onChange(of: chatManager.currentChatID) { vm.clearHistory() }
-        .onChange(of: chatManager.lastResetToken) { vm.clearHistory() }
+        .task(id: chatManager.currentChatID) {
+            if let id = chatManager.currentChatID { vm.loadTurns(forChatID: id) }
+        }
+        .onChange(of: chatManager.lastResetToken) { _, _ in
+            if let id = chatManager.currentChatID { vm.clearHistory(forChatID: id) }
+        }
         .alert("Error", isPresented: .constant(vm.errorMessage != nil)) {
             Button("OK") { vm.errorMessage = nil }
         } message: {

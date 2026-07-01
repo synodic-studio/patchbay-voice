@@ -1,10 +1,16 @@
 import Foundation
 import Observation
 
-struct TurnItem: Identifiable {
-    let id = UUID()
+struct TurnItem: Identifiable, Codable {
+    let id: UUID
     let transcript: String
     let reply: String
+
+    init(transcript: String, reply: String) {
+        id = UUID()
+        self.transcript = transcript
+        self.reply = reply
+    }
 }
 
 @MainActor
@@ -22,10 +28,23 @@ final class TalkViewModel {
 
     var hasReplayable: Bool { !lastAudioChunks.isEmpty }
 
-    func clearHistory() {
-        turns.removeAll()
+    func loadTurns(forChatID id: String) {
         lastAudioChunks = []
         player.stop()
+        guard let data = UserDefaults.standard.data(forKey: "turns.\(id)"),
+              let saved = try? JSONDecoder().decode([TurnItem].self, from: data)
+        else {
+            turns = []
+            return
+        }
+        turns = saved
+    }
+
+    func clearHistory(forChatID id: String) {
+        turns = []
+        lastAudioChunks = []
+        player.stop()
+        UserDefaults.standard.removeObject(forKey: "turns.\(id)")
     }
 
     func startRecording() {
@@ -58,11 +77,18 @@ final class TalkViewModel {
         try? player.playSequence(lastAudioChunks)
     }
 
+    private func _appendTurn(_ item: TurnItem, chat: Chat) {
+        turns.append(item)
+        if let data = try? JSONEncoder().encode(turns) {
+            UserDefaults.standard.set(data, forKey: "turns.\(chat.id)")
+        }
+    }
+
     private func _processAudioTurn(audio: Data, chat: Chat, client: ServerClient) async {
         isProcessing = true
         do {
             let response = try await client.sendTurn(chatID: chat.id, audioData: audio, settings: .current)
-            turns.append(TurnItem(transcript: response.transcript, reply: response.reply))
+            _appendTurn(TurnItem(transcript: response.transcript, reply: response.reply), chat: chat)
             await _playResponse(response, client: client)
         } catch {
             errorMessage = error.localizedDescription
@@ -75,7 +101,7 @@ final class TalkViewModel {
         isProcessing = true
         do {
             let response = try await client.sendTextTurn(chatID: chat.id, text: text, settings: .current)
-            turns.append(TurnItem(transcript: text, reply: response.reply))
+            _appendTurn(TurnItem(transcript: text, reply: response.reply), chat: chat)
             await _playResponse(response, client: client)
         } catch {
             errorMessage = error.localizedDescription
