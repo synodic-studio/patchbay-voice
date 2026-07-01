@@ -63,5 +63,22 @@ platform :ios do
       distribute_external: false,
       notify_external_testers: false,
     )
+
+    asc_script = File.expand_path(
+      "~/.claude/plugins/cache/synodic-kit/synodic-kit/784f1c68a326/skills/testflight-ship/scripts/asc.py",
+    )
+    app_id = "6785742336"
+    sh("uv tool run --from authlib --with httpx python3 #{asc_script} auto-notify --app-id #{app_id}")
+    sh("uv tool run --from authlib --with httpx python3 #{asc_script} ensure-invited --app-id #{app_id}")
+  end
+
+  desc "Increment CURRENT_PROJECT_VERSION in Project.swift"
+  lane :bump_build do
+    project_path = File.expand_path("../Project.swift", __dir__)
+    content = File.read(project_path)
+    current = content[/"CURRENT_PROJECT_VERSION": "(\d+)"/, 1].to_i
+    next_build = current + 1
+    File.write(project_path, content.sub(/"CURRENT_PROJECT_VERSION": "\d+"/, "\"CURRENT_PROJECT_VERSION\": \"#{next_build}\""))
+    UI.success("Bumped build: #{current} → #{next_build}")
   end
 end
