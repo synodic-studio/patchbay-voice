@@ -20,7 +20,7 @@ async def synthesize(text: str) -> Path:
     out = AUDIO_DIR / f"{uid}.m4a"
 
     def _run():
-        subprocess.run(["say", "-v", TTS_VOICE, "-o", str(aiff), text], check=True)
+        subprocess.run(["say", "-v", TTS_VOICE, "-o", str(aiff), "--", text], check=True)
         subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", str(aiff), str(out)], check=True)
         aiff.unlink(missing_ok=True)
 

@@ -69,7 +69,7 @@ async def run_pi(user_text: str, chat: Chat) -> str:
         cmd.extend(["--append-system-prompt", str(SYSTEM_PROMPT)])
         cmd.extend(["--no-builtin-tools"])
         cmd.extend(["--extension", str(EXTENSION_PATH)])
-        cmd.append(user_text)
+        cmd.extend(["--", user_text])
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout, result.stderr, result.returncode
