@@ -5,14 +5,20 @@ struct TalkView: View {
     @Binding var showChats: Bool
     @State private var vm = TalkViewModel()
     @State private var textInput = ""
+    @State private var showTextInput = false
+    @AppStorage("audioResponseEnabled") private var audioResponseEnabled = true
 
     var body: some View {
         VStack(spacing: 20) {
             chatHeader
             responseScroll
             statusRow
-            inputBar
-            voiceRow
+            if showTextInput {
+                inputBar
+            } else {
+                voiceRow
+            }
+            controlRow
         }
         .padding()
         .alert("Error", isPresented: .constant(vm.errorMessage != nil)) {
@@ -63,10 +69,6 @@ struct TalkView: View {
                 .onSubmit { submitText() }
             if !textInput.isEmpty {
                 Button("Send") { submitText() }
-            } else if vm.hasReplayable, !vm.player.isPlaying {
-                Button { vm.replay() } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                }
             }
         }
     }
@@ -78,6 +80,40 @@ struct TalkView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .animation(.default, value: vm.recorder.isRecording)
+        }
+    }
+
+    private var controlRow: some View {
+        HStack(spacing: 24) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showTextInput.toggle()
+                }
+            } label: {
+                Image(systemName: showTextInput ? "mic.fill" : "keyboard")
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
+
+            if vm.player.isPlaying {
+                Button { vm.player.stop() } label: {
+                    Image(systemName: "stop.fill")
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+            } else if vm.hasReplayable {
+                Button { vm.replay() } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+
+            Toggle("Audio", isOn: $audioResponseEnabled)
+                .toggleStyle(.switch)
+                .font(.caption)
         }
     }
 
