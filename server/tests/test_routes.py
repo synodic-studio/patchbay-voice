@@ -60,21 +60,20 @@ class TestChatsRoutes:
         assert r.status_code == 400
         assert "detail" in r.json()
 
-    def test_projects_list(self, client, tmp_dev):
-        (tmp_dev / "alpha").mkdir()
-        (tmp_dev / "beta").mkdir()
+    def test_projects_list_sorted_case_insensitive(self, client, tmp_dev):
+        for name in ["Zebra", "alpha", "Beta"]:
+            (tmp_dev / name).mkdir()
         r = client.get("/api/projects")
         assert r.status_code == 200
         projects = r.json()["projects"]
-        assert "alpha" in projects
-        assert "beta" in projects
+        assert projects == sorted(projects, key=str.casefold)
 
-    def test_create_duplicate_project_dirs_allowed(self, client, tmp_dev):
+    def test_create_same_project_dir_returns_existing(self, client, tmp_dev):
         r1 = client.post("/api/chats", json={"project_dir": "proj"})
         r2 = client.post("/api/chats", json={"project_dir": "proj"})
         assert r1.status_code == 200
         assert r2.status_code == 200
-        assert r1.json()["id"] != r2.json()["id"]
+        assert r1.json()["id"] == r2.json()["id"]
 
 
 # ── /api/talk — error contract ────────────────────────────────────────────────

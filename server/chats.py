@@ -60,6 +60,9 @@ def create_chat(project_dir: str) -> Chat:
     base = (DEVELOPER_DIR / rel).resolve()
     if not base.is_dir() or DEVELOPER_DIR not in base.parents:
         raise ValueError("project_dir must resolve to a directory under DEVELOPER_DIR")
+    for existing in _chats.values():
+        if existing.project_dir == str(rel):
+            return existing
     chat = Chat(
         id=uuid.uuid4().hex,
         name=str(rel),

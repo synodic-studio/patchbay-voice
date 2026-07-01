@@ -1,70 +1,65 @@
 import SwiftUI
 
-private enum ChatSort: String, CaseIterable {
-    case lastActive = "Recent"
-    case alphabetical = "A–Z"
-}
-
 struct ChatListView: View {
     @Environment(ChatManager.self) private var chatManager
     @Environment(\.dismiss) private var dismiss
-    @State private var showNewChat = false
-    @State private var sort: ChatSort = .lastActive
+    @State private var search = ""
 
-    private var sortedChats: [Chat] {
-        switch sort {
-        case .lastActive:
-            chatManager.chats.sorted { $0.lastActive > $1.lastActive }
-        case .alphabetical:
-            chatManager.chats.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
+    private var chatByProject: [String: Chat] {
+        Dictionary(chatManager.chats.map { ($0.projectDir, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    private var filtered: [String] {
+        let sorted = chatManager.projects.sorted {
+            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
         }
+        return search.isEmpty ? sorted : sorted.filter { $0.localizedCaseInsensitiveContains(search) }
     }
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(sortedChats) { chat in
-                    chatRow(for: chat)
+            List(filtered, id: \.self) { project in
+                projectRow(for: project)
+            }
+            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
+            .navigationTitle("Projects")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
                 }
             }
-            .navigationTitle("Chats")
-            .toolbar { toolbarItems }
-            .sheet(isPresented: $showNewChat) { NewChatView() }
-        }
-    }
-
-    @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button("Done") { dismiss() }
-        }
-        ToolbarItem(placement: .principal) {
-            Picker("Sort", selection: $sort) {
-                ForEach(ChatSort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 140)
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button("New", systemImage: "plus") { showNewChat = true }
         }
     }
 
     @ViewBuilder
-    private func chatRow(for chat: Chat) -> some View {
-        HStack {
-            Button(chat.name) {
-                chatManager.currentChatID = chat.id
+    private func projectRow(for project: String) -> some View {
+        let chat = chatByProject[project]
+        let isCurrent = chat?.id == chatManager.currentChatID
+        Button {
+            Task {
+                await chatManager.switchOrCreate(projectDir: project)
                 dismiss()
             }
-            .bold(chat.id == chatManager.currentChatID)
-            Spacer()
-            Button("Reset") { Task { await chatManager.resetChat(id: chat.id) } }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        } label: {
+            HStack {
+                Text(project)
+                    .bold(isCurrent)
+                    .foregroundStyle(chat != nil ? .primary : .secondary)
+                Spacer()
+                if isCurrent {
+                    Image(systemName: "checkmark").foregroundColor(.accentColor)
+                }
+            }
         }
-        .swipeActions {
-            Button("Delete", role: .destructive) {
-                Task { await chatManager.deleteChat(id: chat.id) }
+        .swipeActions(edge: .trailing) {
+            if let chat {
+                Button("Delete", role: .destructive) {
+                    Task { await chatManager.deleteChat(id: chat.id) }
+                }
+                Button("Reset") {
+                    Task { await chatManager.resetChat(id: chat.id) }
+                }
+                .tint(.orange)
             }
         }
     }

@@ -30,10 +30,9 @@ struct TalkView: View {
     }
 
     private var chatHeader: some View {
-        Button(chatManager.currentChat?.name ?? "No chat — tap to create one") {
-            showChats = true
-        }
-        .font(.headline)
+        Text(chatManager.currentChat?.name ?? "Open Projects to get started")
+            .font(.headline)
+            .foregroundStyle(chatManager.currentChat == nil ? .secondary : .primary)
     }
 
     private var historyScroll: some View {

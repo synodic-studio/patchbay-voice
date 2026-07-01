@@ -29,10 +29,20 @@ final class ChatManager {
         }
     }
 
+    func switchOrCreate(projectDir: String) async {
+        if let existing = chats.first(where: { $0.projectDir == projectDir }) {
+            currentChatID = existing.id
+            return
+        }
+        await createChat(projectDir: projectDir)
+    }
+
     func createChat(projectDir: String) async {
         do {
             let chat = try await client.createChat(projectDir: projectDir)
-            chats.insert(chat, at: 0)
+            if !chats.contains(where: { $0.id == chat.id }) {
+                chats.insert(chat, at: 0)
+            }
             currentChatID = chat.id
         } catch {
             errorMessage = error.localizedDescription

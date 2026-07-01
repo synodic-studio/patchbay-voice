@@ -34,7 +34,9 @@ def healthz():
 @router.get("/api/projects")
 def list_projects():
     try:
-        dirs = sorted(d.name for d in DEVELOPER_DIR.iterdir() if d.is_dir() and not d.name.startswith("."))
+        dirs = sorted(
+            (d.name for d in DEVELOPER_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")), key=str.casefold
+        )
         return {"projects": dirs}
     except Exception as exc:
         raise HTTPException(500, str(exc))
