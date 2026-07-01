@@ -41,7 +41,7 @@ async def talk(
 
     # Validate and resolve save_path
     clean_save = save_path.strip().lstrip("/")
-    if ".." in Path(clean_save).parts:
+    if clean_save.startswith("-") or ".." in Path(clean_save).parts:
         raise HTTPException(400, "save_path must not contain ..")
     project_dir = DEVELOPER_DIR / chat.project_dir
     abs_save = (project_dir / clean_save).resolve()
@@ -126,7 +126,7 @@ def _ensure_file(path: Path, content: str) -> None:
 
 def _git_commit(project_dir: Path, save_path: str) -> None:
     try:
-        subprocess.run(["git", "add", save_path], cwd=str(project_dir), capture_output=True, timeout=10)
+        subprocess.run(["git", "add", "--", save_path], cwd=str(project_dir), capture_output=True, timeout=10)
         diff = subprocess.run(
             ["git", "diff", "--cached", "--quiet"],
             cwd=str(project_dir),
