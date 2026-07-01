@@ -8,6 +8,7 @@ dependencies = [
     "faster-whisper>=1.2.1",
     "python-multipart>=0.0.32",
     "httpx>=0.28.0",
+    "google-auth>=2.40.0",
 ]
 
 [tool.uv]

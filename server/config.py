@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import tempfile
 from os import environ
 from pathlib import Path
+
+
+def _pass_show(name: str) -> str:
+    try:
+        return subprocess.check_output(["pass", "show", name], text=True).strip()
+    except Exception:
+        return ""
+
 
 HOST = environ.get("VOICE_HOST", "127.0.0.1")
 PORT = int(environ.get("VOICE_PORT", "8800"))
@@ -29,7 +38,9 @@ DEVELOPER_DIR = Path(environ.get("DEVELOPER_DIR", "~/Developer")).expanduser()
 CHATS_FILE = Path(environ.get("CHATS_FILE", "~/.voice-demo-chats.json").strip()).expanduser()
 
 TTS_VOICE = environ.get("TTS_VOICE", "Samantha")
-GOOGLE_TTS_API_KEY = environ.get("GOOGLE_TTS_API_KEY", "")
+GOOGLE_TTS_SERVICE_ACCOUNT_JSON = environ.get("GOOGLE_TTS_SERVICE_ACCOUNT_JSON") or _pass_show(
+    "google-tts-service-account"
+)
 GOOGLE_TTS_VOICE = environ.get("GOOGLE_TTS_VOICE", "en-US-Chirp3-HD-Schedar")
 
 SYSTEM_PROMPT = (

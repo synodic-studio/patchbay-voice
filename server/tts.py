@@ -10,7 +10,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
-from config import AUDIO_DIR, GOOGLE_TTS_API_KEY, GOOGLE_TTS_VOICE, TTS_VOICE
+from config import AUDIO_DIR, GOOGLE_TTS_VOICE, TTS_VOICE
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -65,12 +65,37 @@ async def _say_tts(text: str) -> Path:
     return out
 
 
+_google_creds = None
+
+
+def _get_google_token() -> str:
+    global _google_creds
+    import json
+
+    import google.auth.transport.requests
+    import google.oauth2.service_account
+
+    from config import GOOGLE_TTS_SERVICE_ACCOUNT_JSON
+
+    if not GOOGLE_TTS_SERVICE_ACCOUNT_JSON:
+        raise HTTPException(500, "google-tts-service-account not found in pass")
+
+    if _google_creds is None:
+        info = json.loads(GOOGLE_TTS_SERVICE_ACCOUNT_JSON)
+        _google_creds = google.oauth2.service_account.Credentials.from_service_account_info(
+            info, scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+
+    if not _google_creds.valid:
+        _google_creds.refresh(google.auth.transport.requests.Request())
+
+    return _google_creds.token
+
+
 async def _google_tts(text: str) -> Path:
     import httpx
 
-    if not GOOGLE_TTS_API_KEY:
-        raise HTTPException(500, "GOOGLE_TTS_API_KEY not configured — set env var or use provider=say")
-
+    token = await asyncio.to_thread(_get_google_token)
     uid = uuid.uuid4().hex
     out = AUDIO_DIR / f"{uid}.mp3"
 
@@ -82,8 +107,9 @@ async def _google_tts(text: str) -> Path:
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.post(
-            f"https://texttospeech.googleapis.com/v1/text:synthesize?key={GOOGLE_TTS_API_KEY}",
+            "https://texttospeech.googleapis.com/v1/text:synthesize",
             json=payload,
+            headers={"Authorization": f"Bearer {token}"},
         )
         if resp.status_code != 200:
             raise HTTPException(502, f"Google TTS error {resp.status_code}: {resp.text[:200]}")
