@@ -41,6 +41,9 @@ struct TalkButtonView: View {
             )
             .disabled(vm.pendingAudioData != nil || chatManager.currentChat == nil)
             .animation(.easeInOut(duration: 0.15), value: vm.isCapturing)
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("Hold to talk")
             .accessibilityIdentifier("mic-btn")
     }
 
