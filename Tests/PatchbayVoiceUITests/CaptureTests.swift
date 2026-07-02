@@ -22,35 +22,39 @@ final class CaptureTests: XCTestCase {
 
     func testCaptureScreenshots() throws {
         _ = app.wait(for: .runningForeground, timeout: 10)
-        sleep(2)
+        // Let mock sessions + injected turns load before anything
+        sleep(3)
 
         // Sessions list
         let sessionsBtn = app.buttons["sessions-btn"]
         XCTAssert(sessionsBtn.waitForExistence(timeout: 5))
         sessionsBtn.tap()
-        sleep(1)
+        sleep(2)
         screenshot("sim-sessions")
 
-        // Activate first session
+        // Tap first session row to confirm selection
         let firstRow = app.buttons.matching(identifier: "session-row").firstMatch
-        if firstRow.waitForExistence(timeout: 5) {
-            firstRow.tap()
-            sleep(2)
-        }
+        XCTAssert(firstRow.waitForExistence(timeout: 5))
+        firstRow.tap()
+        sleep(2)
 
-        // Talk screen — hold mic to trigger mock turn
+        // Talk screen — conversation history visible, about to record
+        screenshot("sim-talk-history")
+
+        // Hold mic: use coordinate drag-to-self so DragGesture fires correctly
         let micBtn = app.buttons["mic-btn"]
-        if micBtn.waitForExistence(timeout: 5) {
-            micBtn.press(forDuration: 2.5) // onChanged → red, onEnded → mockTurn
-            sleep(4) // 1.5s thinking + 1s response settle
-        }
+        XCTAssert(micBtn.waitForExistence(timeout: 5))
+        let micCenter = micBtn.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        micCenter.press(forDuration: 2.5, thenDragTo: micCenter)
+        sleep(4) // 1.5s thinking + buffer for turn to appear
+
         screenshot("sim-talk")
 
-        // Settings sheet
+        // Settings
         let settingsBtn = app.buttons["settings-btn"]
         XCTAssert(settingsBtn.waitForExistence(timeout: 5))
         settingsBtn.tap()
-        sleep(1)
+        sleep(2)
         screenshot("sim-settings")
 
         app.buttons["Done"].tap()

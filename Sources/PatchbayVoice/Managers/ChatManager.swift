@@ -18,6 +18,16 @@ final class ChatManager {
     }
 
     func load() async {
+        if CommandLine.arguments.contains("--uitesting-mock-turn") {
+            let now = Date().timeIntervalSince1970
+            chats = [
+                Chat(id: "mock-patchbay-relay", name: "patchbay-relay", projectDir: "patchbay-relay", createdAt: now - 86400, lastActive: now - 120),
+                Chat(id: "mock-synodic-co", name: "synodic-co", projectDir: "synodic-co", createdAt: now - 172_800, lastActive: now - 3600),
+                Chat(id: "mock-podwash", name: "podwash", projectDir: "podwash", createdAt: now - 259_200, lastActive: now - 86400),
+            ]
+            currentChatID = chats.first?.id
+            return
+        }
         do {
             async let chats = client.fetchChats()
             async let projects = client.fetchProjects()
