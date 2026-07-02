@@ -15,26 +15,52 @@ struct NewChatView: View {
 
     var body: some View {
         NavigationStack {
-            List(available, id: \.self) { project in
-                Button(project) {
-                    Task {
-                        await chatManager.createChat(projectDir: project)
-                        dismiss()
+            List {
+                if !available.isEmpty {
+                    Section {
+                        ForEach(available, id: \.self) { project in
+                            repoRow(project)
+                        }
+                    } header: {
+                        Text("All repos · A–Z")
+                            .textCase(.uppercase)
+                            .font(.caption)
                     }
                 }
             }
             .overlay {
                 if available.isEmpty {
-                    Text("All projects have chats")
+                    Text("All projects have sessions")
                         .foregroundStyle(.secondary)
                 }
             }
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
-            .navigationTitle("New Chat")
+            .navigationTitle("New Session")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+        }
+    }
+
+    private func repoRow(_ project: String) -> some View {
+        Button {
+            Task {
+                await chatManager.createChat(projectDir: project)
+                dismiss()
+            }
+        } label: {
+            HStack {
+                Image(systemName: "folder")
+                    .foregroundStyle(Color.blueAccent)
+                    .frame(width: 28)
+                Text(project)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.tertiary)
+                    .font(.caption)
             }
         }
     }

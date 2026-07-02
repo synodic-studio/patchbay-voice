@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("serverURL") private var serverURL = "http://localhost:8800"
+    @AppStorage("audioResponseEnabled") private var audioResponseEnabled = true
     @AppStorage("ttsProvider") private var ttsProvider = "say"
     @AppStorage("defaultSavePath") private var defaultSavePath = "docs/patchbay/"
     @AppStorage("createAgentsMD") private var createAgentsMD = false
@@ -20,9 +21,8 @@ struct SettingsView: View {
             Form {
                 serverSection
                 ModelSectionView()
-                ttsSection
-                savePathSection
-                agentContextSection
+                voiceSection
+                filesSection
                 Section {
                     Text("Version \(version)").foregroundStyle(.secondary)
                 }
@@ -45,30 +45,26 @@ struct SettingsView: View {
         }
     }
 
-    private var ttsSection: some View {
-        Section("Text-to-Speech") {
-            Picker("TTS Provider", selection: $ttsProvider) {
+    private var voiceSection: some View {
+        Section("Voice") {
+            Toggle("Spoken replies", isOn: $audioResponseEnabled)
+            Picker("Provider", selection: $ttsProvider) {
                 Text("macOS Say").tag("say")
                 Text("Google Cloud").tag("google")
             }
         }
     }
 
-    private var savePathSection: some View {
-        Section("Save Path") {
-            TextField("docs/patchbay/", text: $defaultSavePath)
+    private var filesSection: some View {
+        Section("Files") {
+            TextField("Save path", text: $defaultSavePath)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-        }
-    }
-
-    private var agentContextSection: some View {
-        Section("Agent Context") {
+            Toggle("Auto-commit to Git", isOn: $autoCommitEnabled)
             Toggle("Create AGENTS.md in save path", isOn: $createAgentsMD)
             if createAgentsMD {
                 Toggle("Also create CLAUDE.md", isOn: $createClaudeMD)
             }
-            Toggle("Auto-commit save path to Git", isOn: $autoCommitEnabled)
         }
     }
 }

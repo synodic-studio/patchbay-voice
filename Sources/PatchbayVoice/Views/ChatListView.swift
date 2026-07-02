@@ -8,28 +8,32 @@ private enum ChatSort: String, CaseIterable {
 struct ChatListView: View {
     @Environment(ChatManager.self) private var chatManager
     @Environment(\.dismiss) private var dismiss
-    @State private var showNewChat = false
+    @State private var showNewSession = false
     @State private var sort: ChatSort = .lastActive
+    @State private var search = ""
 
     private var sortedChats: [Chat] {
-        switch sort {
+        let base: [Chat] = switch sort {
         case .lastActive:
             chatManager.chats.sorted { $0.lastActive > $1.lastActive }
         case .alphabetical:
             chatManager.chats.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         }
+        guard !search.isEmpty else { return base }
+        return base.filter { $0.name.localizedCaseInsensitiveContains(search) }
     }
 
     var body: some View {
         NavigationStack {
             List {
                 ForEach(sortedChats) { chat in
-                    chatRow(for: chat)
+                    sessionRow(for: chat)
                 }
             }
-            .navigationTitle("Chats")
+            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
+            .navigationTitle("Sessions")
             .toolbar { toolbarItems }
-            .sheet(isPresented: $showNewChat) { NewChatView() }
+            .sheet(isPresented: $showNewSession) { NewChatView() }
         }
     }
 
@@ -37,25 +41,57 @@ struct ChatListView: View {
         ToolbarItem(placement: .topBarLeading) {
             Button("Done") { dismiss() }
         }
-        ToolbarItem(placement: .principal) {
-            Picker("Sort", selection: $sort) {
-                ForEach(ChatSort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                ForEach(ChatSort.allCases, id: \.self) { option in
+                    Button {
+                        sort = option
+                    } label: {
+                        if sort == option {
+                            Label(option.rawValue, systemImage: "checkmark")
+                        } else {
+                            Text(option.rawValue)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
             }
-            .pickerStyle(.segmented)
-            .frame(width: 140)
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Button("New", systemImage: "plus") { showNewChat = true }
+            Button { showNewSession = true } label: {
+                Image(systemName: "plus")
+            }
         }
     }
 
     @ViewBuilder
-    private func chatRow(for chat: Chat) -> some View {
-        Button(chat.name) {
+    private func sessionRow(for chat: Chat) -> some View {
+        Button {
             chatManager.currentChatID = chat.id
             dismiss()
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Circle()
+                    .fill(chat.id == chatManager.currentChatID ? Color.greenActive : Color.secondary.opacity(0.4))
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 5)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(chat.name)
+                        .font(.body)
+                        .fontWeight(chat.id == chatManager.currentChatID ? .semibold : .regular)
+                        .foregroundStyle(.primary)
+                    Text(chat.projectDir)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospaced()
+                }
+                Spacer()
+                Text(timeAgo(chat.lastActive))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .bold(chat.id == chatManager.currentChatID)
         .swipeActions(edge: .trailing) {
             Button("Delete", role: .destructive) {
                 Task { await chatManager.deleteChat(id: chat.id) }
@@ -65,5 +101,11 @@ struct ChatListView: View {
             }
             .tint(.orange)
         }
+    }
+
+    private func timeAgo(_ timestamp: Double) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: Date(timeIntervalSince1970: timestamp), relativeTo: Date())
     }
 }

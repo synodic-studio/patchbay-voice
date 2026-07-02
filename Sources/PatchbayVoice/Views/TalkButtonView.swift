@@ -23,38 +23,51 @@ struct TalkButtonView: View {
     }
 
     private var holdToTalkButton: some View {
-        circle(
-            color: vm.recorder.isRecording ? .red : .accentColor,
-            icon: vm.recorder.isRecording ? "waveform" : "mic.fill",
-        )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in if !vm.recorder.isRecording { vm.startRecording() } }
-                .onEnded { _ in
-                    guard let chat = chatManager.currentChat else { return }
-                    Task { await vm.stopAndSend(chat: chat, client: chatManager.client) }
-                },
-        )
-        .disabled(vm.pendingAudioData != nil || chatManager.currentChat == nil)
-        .animation(.easeInOut(duration: 0.15), value: vm.recorder.isRecording)
+        micCircle
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in if !vm.recorder.isRecording { vm.startRecording() } }
+                    .onEnded { _ in
+                        guard let chat = chatManager.currentChat else { return }
+                        Task { await vm.stopAndSend(chat: chat, client: chatManager.client) }
+                    },
+            )
+            .disabled(vm.pendingAudioData != nil || chatManager.currentChat == nil)
+            .animation(.easeInOut(duration: 0.15), value: vm.recorder.isRecording)
+    }
+
+    private var micCircle: some View {
+        ZStack {
+            if vm.recorder.isRecording {
+                Circle()
+                    .fill(Color.blueAccent.opacity(0.20))
+                    .frame(width: 100, height: 100)
+            }
+            Circle()
+                .fill(vm.recorder.isRecording ? Color.red : Color.blueAccent)
+                .frame(width: 78, height: 78)
+            Image(systemName: vm.recorder.isRecording ? "waveform" : "mic.fill")
+                .font(.system(size: 28))
+                .foregroundStyle(.white)
+        }
     }
 
     private func permissionCircle(label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            circle(color: .gray, icon: "mic.slash.fill")
+            ZStack {
+                Circle()
+                    .fill(Color.graphiteBase)
+                    .frame(width: 78, height: 78)
+                Image(systemName: "mic.slash.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.secondary)
+            }
         }
         .overlay(alignment: .bottom) {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .offset(y: 18)
-        }
-    }
-
-    private func circle(color: Color, icon: String) -> some View {
-        ZStack {
-            Circle().fill(color).frame(width: 88, height: 88)
-            Image(systemName: icon).font(.system(size: 32)).foregroundStyle(.white)
         }
     }
 
