@@ -25,8 +25,10 @@ final class TalkViewModel {
     let recorder = RecorderManager()
     let player = PlayerManager()
     private(set) var lastAudioChunks: [Data] = []
+    private(set) var isMockRecording = false
 
     var hasReplayable: Bool { !lastAudioChunks.isEmpty }
+    var isCapturing: Bool { recorder.isRecording || isMockRecording }
 
     func loadTurns(forChatID id: String) {
         lastAudioChunks = []
@@ -48,8 +50,25 @@ final class TalkViewModel {
     }
 
     func startRecording() {
-        try? AudioSessionManager.configure()
-        try? recorder.start()
+        if CommandLine.arguments.contains("--uitesting-mock-turn") {
+            isMockRecording = true
+        } else {
+            try? AudioSessionManager.configure()
+            try? recorder.start()
+        }
+    }
+
+    func mockTurn(chat: Chat) {
+        isMockRecording = false
+        isProcessing = true
+        Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            _appendTurn(TurnItem(
+                transcript: "What changed in the last commit?",
+                reply: "Added the UITest target and accessibility identifiers. Sessions button, settings button, and session rows now have stable IDs so headless screenshot capture runs fully automated.",
+            ), chat: chat)
+            isProcessing = false
+        }
     }
 
     func stopAndSend(chat: Chat, client: ServerClient) async {

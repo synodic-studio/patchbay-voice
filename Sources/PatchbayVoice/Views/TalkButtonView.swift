@@ -6,18 +6,21 @@ struct TalkButtonView: View {
     let vm: TalkViewModel
     @State private var permission: AVAudioApplication.recordPermission = .undetermined
 
+    private var isMockCapture: Bool {
+        CommandLine.arguments.contains("--uitesting-mock-turn")
+    }
+
     var body: some View {
         buttonForPermission
             .onAppear { permission = AVAudioApplication.shared.recordPermission }
     }
 
     @ViewBuilder private var buttonForPermission: some View {
-        switch permission {
-        case .granted:
+        if permission == .granted || isMockCapture {
             holdToTalkButton
-        case .undetermined:
+        } else if permission == .undetermined {
             permissionCircle(label: "Enable Mic") { requestPermission() }
-        default:
+        } else {
             permissionCircle(label: "Mic Denied") { openSettings() }
         }
     }
@@ -26,27 +29,32 @@ struct TalkButtonView: View {
         micCircle
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
-                    .onChanged { _ in if !vm.recorder.isRecording { vm.startRecording() } }
+                    .onChanged { _ in if !vm.isCapturing { vm.startRecording() } }
                     .onEnded { _ in
                         guard let chat = chatManager.currentChat else { return }
-                        Task { await vm.stopAndSend(chat: chat, client: chatManager.client) }
+                        if isMockCapture {
+                            vm.mockTurn(chat: chat)
+                        } else {
+                            Task { await vm.stopAndSend(chat: chat, client: chatManager.client) }
+                        }
                     },
             )
             .disabled(vm.pendingAudioData != nil || chatManager.currentChat == nil)
-            .animation(.easeInOut(duration: 0.15), value: vm.recorder.isRecording)
+            .animation(.easeInOut(duration: 0.15), value: vm.isCapturing)
+            .accessibilityIdentifier("mic-btn")
     }
 
     private var micCircle: some View {
         ZStack {
-            if vm.recorder.isRecording {
+            if vm.isCapturing {
                 Circle()
                     .fill(Color.blueAccent.opacity(0.20))
                     .frame(width: 100, height: 100)
             }
             Circle()
-                .fill(vm.recorder.isRecording ? Color.red : Color.blueAccent)
+                .fill(vm.isCapturing ? Color.red : Color.blueAccent)
                 .frame(width: 78, height: 78)
-            Image(systemName: vm.recorder.isRecording ? "waveform" : "mic.fill")
+            Image(systemName: vm.isCapturing ? "waveform" : "mic.fill")
                 .font(.system(size: 28))
                 .foregroundStyle(.white)
         }
