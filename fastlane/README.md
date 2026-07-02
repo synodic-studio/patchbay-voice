@@ -37,7 +37,7 @@ Build and upload a new beta to TestFlight
 [bundle exec] fastlane ios bump_build
 ```
 
-Increment CURRENT_PROJECT_VERSION in Project.swift
+Increment CURRENT_PROJECT_VERSION in Project.swift, anchored to latest TestFlight build
 
 ----
 
