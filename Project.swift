@@ -58,13 +58,22 @@ let project = Project(
             sources: "Tests/PatchbayVoiceTests/**/*.swift",
             dependencies: [.target(name: "PatchbayVoice")],
         ),
+        .target(
+            name: "PatchbayVoiceUITests",
+            destinations: .iOS,
+            product: .uiTests,
+            bundleId: "co.synodic.patchbay-voice-uitests",
+            deploymentTargets: .iOS("17.0"),
+            sources: "Tests/PatchbayVoiceUITests/**/*.swift",
+            dependencies: [.target(name: "PatchbayVoice")],
+        ),
     ],
     schemes: [
         .scheme(
             name: "PatchbayVoice",
             shared: true,
             buildAction: .buildAction(targets: ["PatchbayVoice"]),
-            testAction: .targets(["PatchbayVoiceTests"]),
+            testAction: .targets(["PatchbayVoiceTests", "PatchbayVoiceUITests"]),
             runAction: .runAction(configuration: "Debug", executable: "PatchbayVoice"),
         ),
     ],

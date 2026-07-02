@@ -22,6 +22,7 @@ struct ContentView: View {
             Button { showSessions = true } label: {
                 Image(systemName: "line.3.horizontal")
             }
+            .accessibilityIdentifier("sessions-btn")
         }
         ToolbarItem(placement: .principal) {
             sessionHeader
@@ -41,6 +42,7 @@ struct ContentView: View {
             Button { showSettings = true } label: {
                 Image(systemName: "slider.horizontal.3")
             }
+            .accessibilityIdentifier("settings-btn")
         }
     }
 

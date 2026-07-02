@@ -92,6 +92,7 @@ struct ChatListView: View {
                     .foregroundStyle(.tertiary)
             }
         }
+        .accessibilityIdentifier("session-row")
         .swipeActions(edge: .trailing) {
             Button("Delete", role: .destructive) {
                 Task { await chatManager.deleteChat(id: chat.id) }
