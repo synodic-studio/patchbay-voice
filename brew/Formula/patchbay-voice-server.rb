@@ -23,6 +23,8 @@ class PatchbayVoiceServer < Formula
 
     cd(libexec) do
       system "uv", "sync"
+      # anyio needs exceptiongroup on Xcode's minimal Python
+      system "uv", "pip", "install", "--quiet", "exceptiongroup"
 
       # Rewrite pyvenv.cfg "home" from build-temp to the actual uv-managed Python
       system "sed", "-i", "", "s|^home = .*|home = #{real_bindir}|", ".venv/pyvenv.cfg"
