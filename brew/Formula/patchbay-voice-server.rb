@@ -1,10 +1,12 @@
 class PatchbayVoiceServer < Formula
+  include Language::Python::Virtualenv
+
   desc "Voice interface to the pi coding agent — local server"
   homepage "https://github.com/synodic/patchbay-voice"
   url "https://github.com/synodic/patchbay-voice/archive/refs/tags/v1.0.0.tar.gz"
   head "https://github.com/synodic/patchbay-voice.git", branch: "develop"
 
-  depends_on "uv"
+  depends_on "python@3.14"
   depends_on :macos
 
   def install
@@ -12,26 +14,31 @@ class PatchbayVoiceServer < Formula
                     "server/config.py", "server/pi_runner.py", "server/tts.py"
     (libexec/"routes").install Dir["server/routes/*.py"]
     (libexec/"tests").install Dir["server/tests/*.py"]
-    libexec.install "server/pyproject.toml"
     (libexec/"web").install "web/index.html"
     (libexec/"pi").install "pi/tools.ts"
 
-    cd(libexec) do
-      system "uv", "sync"
+    # Create a standard venv with Homebrew's Python and pip-install deps.
+    # uv sync is faster but creates non-portable venvs tied to build-time paths.
+    venv = virtualenv_create(libexec, "python3.14")
+    venv.pip_install "fastapi>=0.138.1"
+    venv.pip_install "uvicorn>=0.49.0"
+    venv.pip_install "faster-whisper>=1.2.1"
+    venv.pip_install "python-multipart>=0.0.32"
+    venv.pip_install "httpx>=0.28.0"
+    venv.pip_install "google-auth>=2.40.0"
+    venv.pip_install "requests>=2.32.0"
 
-      # Mark bundled dylibs immutable so Homebrew's post-install fixup
-      # doesn't fail on oversize Mach-O headers.
-      Dir.glob("#{libexec}/.venv/**/*.dylib").each do |dylib|
-        system "install_name_tool", "-id", "@rpath/#{File.basename(dylib)}", dylib
-        system "chflags", "uchg", dylib
-      end
+    # Mark bundled dylibs immutable so Homebrew's post-install fixup
+    # doesn't fail on oversize Mach-O headers (faster-whisper bundles ffmpeg
+    # dylibs with short build-time paths).
+    Dir.glob("#{libexec}/lib/python3.14/site-packages/**/*.dylib").each do |dylib|
+      system "install_name_tool", "-id", "@rpath/#{File.basename(dylib)}", dylib
+      system "chflags", "uchg", dylib
     end
 
     (bin/"patchbay-voice").write <<~BASH
       #!/bin/bash
       set -euo pipefail
-      # leave this here so status/help still reference the right path
-      _PB_LIBEXEC="#{libexec}"
       _discover_urls() {
         local port="${VOICE_PORT:-8800}"
         echo "━━━ Patchbay Voice Server ━━━"
@@ -43,7 +50,6 @@ class PatchbayVoiceServer < Formula
         }
         command -v tailscale &>/dev/null && { local ts=$(tailscale ip -4 2>/dev/null || true); [[ -n "$ts" ]] && echo "  http://$ts:$port     (Tailscale)"; }
         echo ""
-        echo "Set a custom host with: VOICE_HOST=<ip> brew services restart patchbay-voice-server"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
       }
       case "${1:-start}" in
@@ -51,7 +57,7 @@ class PatchbayVoiceServer < Formula
           cd "#{libexec}"
           export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
           _discover_urls
-          exec uv run uvicorn app:app \\
+          exec bin/uvicorn app:app \\
             --host "${VOICE_HOST:-0.0.0.0}" \\
             --port "${VOICE_PORT:-8800}" \\
             --log-level info
@@ -86,6 +92,9 @@ class PatchbayVoiceServer < Formula
       Start: brew services start patchbay-voice-server
       URLs:  patchbay-voice urls
       Logs:  patchbay-voice logs
+
+      To change the bind address (default: 0.0.0.0 — all interfaces):
+        echo 'set env VOICE_HOST 127.0.0.1' | brew services restart patchbay-voice-server
     EOS
   end
 
@@ -101,8 +110,10 @@ class PatchbayVoiceServer < Formula
   test do
     assert_match version.to_s, shell_output("#{bin}/patchbay-voice version 2>&1")
     assert_predicate libexec/"app.py", :exist?
-    assert_predicate libexec/"routes/talk.py", :exist?
+    assert_predicate libexec/"bin/uvicorn", :exist?
     assert_predicate libexec/"web/index.html", :exist?
     assert_predicate libexec/"pi/tools.ts", :exist?
+    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python3 -c \"from chats import Chat; print('ok')\"")
+    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python3 -c \"from pi_runner import _parse_events; print('ok')\"")
   end
 end
