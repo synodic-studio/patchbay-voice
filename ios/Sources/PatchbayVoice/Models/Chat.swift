@@ -1,6 +1,6 @@
 import Foundation
 
-struct Chat: Identifiable, Codable, Hashable {
+struct Chat: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
     let projectDir: String

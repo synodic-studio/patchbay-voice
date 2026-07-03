@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-struct TurnItem: Identifiable, Codable {
+struct TurnItem: Identifiable, Codable, Sendable {
     let id: UUID
     let transcript: String
     let reply: String
@@ -18,9 +18,11 @@ struct TurnItem: Identifiable, Codable {
 final class TalkViewModel {
     var turns: [TurnItem] = []
     var isProcessing = false
+    var statusMessage = "Thinking…"
     var errorMessage: String?
     var pendingText: String?
     var pendingAudioData: Data?
+    private var statusTask: Task<Void, Never>?
 
     let recorder = RecorderManager()
     let player = PlayerManager()
@@ -105,6 +107,7 @@ final class TalkViewModel {
 
     private func _processAudioTurn(audio: Data, chat: Chat, client: ServerClient) async {
         isProcessing = true
+        _startStatusTimer()
         do {
             let response = try await client.sendTurn(chatID: chat.id, audioData: audio, settings: .current)
             _appendTurn(TurnItem(transcript: response.transcript, reply: response.reply), chat: chat)
@@ -113,11 +116,15 @@ final class TalkViewModel {
             errorMessage = error.localizedDescription
         }
         isProcessing = false
+        statusTask?.cancel()
+        statusTask = nil
+        statusMessage = "Thinking…"
         await _drainPending(chat: chat, client: client)
     }
 
     private func _processTextTurn(text: String, chat: Chat, client: ServerClient) async {
         isProcessing = true
+        _startStatusTimer()
         do {
             let response = try await client.sendTextTurn(chatID: chat.id, text: text, settings: .current)
             _appendTurn(TurnItem(transcript: text, reply: response.reply), chat: chat)
@@ -126,12 +133,16 @@ final class TalkViewModel {
             errorMessage = error.localizedDescription
         }
         isProcessing = false
+        statusTask?.cancel()
+        statusTask = nil
+        statusMessage = "Thinking…"
         await _drainPending(chat: chat, client: client)
     }
 
     private func _playResponse(_ response: TurnResponse, client: ServerClient) async {
         let paths = response.allAudioPaths
         guard !paths.isEmpty else { return }
+        statusMessage = "Generating audio…"
         do {
             let chunks = try await withThrowingTaskGroup(of: (Int, Data).self) { group in
                 for (i, path) in paths.enumerated() {
@@ -157,6 +168,19 @@ final class TalkViewModel {
         } else if let text = pendingText {
             pendingText = nil
             await _processTextTurn(text: "Queued while you were working: \(text)", chat: chat, client: client)
+        }
+    }
+
+    private func _startStatusTimer() {
+        statusTask?.cancel()
+        statusMessage = "Transcribing…"
+        statusTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            statusMessage = "Thinking…"
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard !Task.isCancelled else { return }
+            statusMessage = "Still thinking…"
         }
     }
 }

@@ -36,7 +36,7 @@ struct ContentView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "arrow.counterclockwise")
+                    Image(systemName: "arrow.triangle.2.circlepath")
                 }
             }
             Button { showSettings = true } label: {

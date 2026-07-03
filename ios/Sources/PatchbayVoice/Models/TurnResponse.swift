@@ -1,6 +1,6 @@
 import Foundation
 
-struct TurnResponse: Decodable {
+struct TurnResponse: Decodable, Sendable {
     let transcript: String
     let reply: String
     let audioURL: String?

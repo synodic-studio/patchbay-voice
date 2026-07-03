@@ -1,0 +1,101 @@
+#!/bin/bash
+# patchbay-voice — Run the Patchbay Voice server
+# Installed by Homebrew: brew install synodic/patchbay-voice/patchbay-voice-server
+
+set -euo pipefail
+
+PB_LIBEXEC="${PB_LIBEXEC:-"$(cd "$(dirname "$0")/../libexec" && pwd)"}"
+
+usage() {
+    cat <<EOF
+Usage: patchbay-voice [command]
+
+Commands:
+  start       Start the server in the foreground (default)
+  status      Show whether the server is running
+  logs        Tail the server log (Ctrl+C to exit)
+  version     Print version info
+  help        Show this help
+
+Background service management (via Homebrew):
+  brew services start patchbay-voice-server
+  brew services stop patchbay-voice-server
+  brew services restart patchbay-voice-server
+
+Environment variables (overrides):
+  VOICE_HOST      Bind address (default: 127.0.0.1)
+  VOICE_PORT      Port (default: 8800)
+  PI_BIN          Path to pi binary
+  PI_PROVIDER     pi provider (default: litellm)
+  PI_MODEL        pi model (default: small)
+  VOICE_SAVE_PATH pi save path (default: docs/patchbay/)
+  GOOGLE_TTS_SERVICE_ACCOUNT_JSON  GCloud TTS credentials JSON
+EOF
+}
+
+_run_server() {
+    cd "${PB_LIBEXEC}"
+    export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+    # Ensure uv environment is up to date
+    uv sync --quiet 2>/dev/null || uv sync
+
+    # Bind 0.0.0.0 by default so the server is reachable via Tailscale
+    exec uv run uvicorn app:app \
+        --host "${VOICE_HOST:-0.0.0.0}" \
+        --port "${VOICE_PORT:-8800}" \
+        --log-level info
+}
+
+cmd_status() {
+    if brew services list 2>/dev/null | grep -q "patchbay-voice-server.*started"; then
+        echo "Running (managed by brew services)"
+    elif launchctl list | grep -q "com.synodic.patchbay-voice-server"; then
+        pid=$(launchctl list "com.synodic.patchbay-voice-server" | awk 'NR==2 {print $1}')
+        if [[ "$pid" != "" && "$pid" != "0" ]]; then
+            echo "Running (pid ${pid})"
+        else
+            echo "Loaded but not running (exit-on-failure mode)"
+        fi
+    else
+        echo "Not running"
+    fi
+}
+
+cmd_logs() {
+    local log="${HOME}/Library/Logs/patchbay-voice-server.log"
+    if [[ ! -f "$log" ]]; then
+        echo "No log file yet at ${log}"
+        exit 1
+    fi
+    tail -f "$log"
+}
+
+cmd_version() {
+    echo "Patchbay Voice Server ${PB_VERSION:-development}"
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+case "${1:-start}" in
+    start)
+        _run_server
+        ;;
+    status)
+        cmd_status
+        ;;
+    logs)
+        cmd_logs
+        ;;
+    version)
+        cmd_version
+        ;;
+    help|--help|-h|"")
+        usage
+        ;;
+    *)
+        echo "Unknown command: $1" >&2
+        echo "Run 'patchbay-voice help' for usage."
+        exit 1
+        ;;
+esac

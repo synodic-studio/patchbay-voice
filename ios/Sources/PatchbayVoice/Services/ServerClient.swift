@@ -1,10 +1,20 @@
 import Foundation
 
-struct ServerClient {
+struct ServerClient: Sendable {
     let baseURL: URL
+    private let session: URLSession
+
+    init(baseURL: URL) {
+        self.baseURL = baseURL
+        let config = URLSessionConfiguration.default
+        // Server has its own 120s pi timeout — client waits generously for the response
+        config.timeoutIntervalForRequest = 180
+        config.timeoutIntervalForResource = 300
+        self.session = URLSession(configuration: config)
+    }
 
     func fetchChats() async throws -> [Chat] {
-        let (data, resp) = try await URLSession.shared.data(from: baseURL.appending(path: "/api/chats"))
+        let (data, resp) = try await session.data(from: baseURL.appending(path: "/api/chats"))
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(ChatListResponse.self, from: data).chats
     }
@@ -14,7 +24,7 @@ struct ServerClient {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(["project_dir": projectDir])
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(Chat.self, from: data)
     }
@@ -22,20 +32,20 @@ struct ServerClient {
     func deleteChat(id: String) async throws {
         var req = URLRequest(url: baseURL.appending(path: "/api/chats/\(id)"))
         req.httpMethod = "DELETE"
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
         try checkStatus(resp, data: data)
     }
 
     func resetChat(id: String) async throws -> Chat {
         var req = URLRequest(url: baseURL.appending(path: "/api/chats/\(id)/reset"))
         req.httpMethod = "POST"
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(Chat.self, from: data)
     }
 
     func fetchProjects() async throws -> [String] {
-        let (data, resp) = try await URLSession.shared.data(from: baseURL.appending(path: "/api/projects"))
+        let (data, resp) = try await session.data(from: baseURL.appending(path: "/api/projects"))
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(ProjectListResponse.self, from: data).projects
     }
@@ -46,7 +56,7 @@ struct ServerClient {
         req.httpMethod = "POST"
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.httpBody = audioMultipartBody(boundary: boundary, chatID: chatID, audioData: audioData, settings: settings)
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(TurnResponse.self, from: data)
     }
@@ -57,13 +67,13 @@ struct ServerClient {
         req.httpMethod = "POST"
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.httpBody = textMultipartBody(boundary: boundary, chatID: chatID, text: text, settings: settings)
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(TurnResponse.self, from: data)
     }
 
     func fetchAudio(path: String) async throws -> Data {
-        let (data, resp) = try await URLSession.shared.data(from: baseURL.appending(path: path))
+        let (data, resp) = try await session.data(from: baseURL.appending(path: path))
         try checkStatus(resp, data: data)
         return data
     }

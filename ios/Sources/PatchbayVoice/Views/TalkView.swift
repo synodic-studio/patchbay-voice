@@ -102,7 +102,7 @@ struct TalkView: View {
         HStack {
             HStack(spacing: 8) {
                 ProgressView().tint(.secondary)
-                Text("Thinking…")
+                Text(vm.statusMessage)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -169,7 +169,7 @@ struct TalkView: View {
         if vm.player.isPlaying {
             iconButton(icon: "stop.fill", active: true) { vm.player.stop() }
         } else if vm.hasReplayable {
-            iconButton(icon: "arrow.counterclockwise") { vm.replay() }
+            iconButton(icon: "gobackward") { vm.replay() }
         } else {
             iconButton(icon: audioResponseEnabled ? "speaker.wave.2" : "speaker.slash", active: audioResponseEnabled) {
                 audioResponseEnabled.toggle()

@@ -1,6 +1,6 @@
 import Foundation
 
-struct TurnSettings {
+struct TurnSettings: Sendable {
     let model: String
     let audioResponse: Bool
     let savePath: String?

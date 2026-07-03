@@ -58,7 +58,7 @@ def create_chat(project_dir: str) -> Chat:
     if rel.is_absolute() or ".." in rel.parts:
         raise ValueError("project_dir must be a relative name under DEVELOPER_DIR")
     base = (DEVELOPER_DIR / rel).resolve()
-    if not base.is_dir() or DEVELOPER_DIR not in base.parents:
+    if not base.is_dir() or DEVELOPER_DIR.resolve() not in base.parents:
         raise ValueError("project_dir must resolve to a directory under DEVELOPER_DIR")
     for existing in _chats.values():
         if existing.project_dir == str(rel):
