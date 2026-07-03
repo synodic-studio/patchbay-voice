@@ -1,8 +1,11 @@
 #!/bin/bash
 # patchbay-voice — Run the Patchbay Voice server
-# Installed by Homebrew: brew install synodic/patchbay-voice/patchbay-voice-server
+# Installed by Homebrew: brew install synodic-studio/synodic/patchbay-voice-server
 
 set -euo pipefail
+
+PB_LIBEXEC="__LIBEXEC__"
+PB_VERSION="__VERSION__"
 
 _discover_urls() {
     local port="${VOICE_PORT:-8800}"
@@ -21,11 +24,11 @@ _discover_urls() {
 
 case "${1:-start}" in
     start)
-        cd "$(dirname "$0")/../libexec"
+        cd "$PB_LIBEXEC"
         export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         _discover_urls
         exec uv run uvicorn app:app \
-            --host "${VOICE_HOST:-0.0.0.0}" \
+            --host "${VOICE_HOST:-127.0.0.1}" \
             --port "${VOICE_PORT:-8800}" \
             --log-level info
         ;;

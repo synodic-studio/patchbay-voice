@@ -23,7 +23,7 @@ else
 fi
 
 VERSION=$(patchbay-voice version 2>&1)
-if [[ "$VERSION" == "Patchbay Voice Server 1.0.0" ]]; then
+if [[ "$VERSION" == "Patchbay Voice Server HEAD-"* ]]; then
     pass "version: $VERSION"
 else
     fail "unexpected version: $VERSION"
@@ -32,7 +32,8 @@ fi
 # ── 2. Python modules load ────────────────────────────────────────────────────
 echo ""
 echo "── 2. Python imports ──"
-PB_PREFIX=$(/opt/homebrew/bin/brew --prefix patchbay-voice-server 2>/dev/null || echo /opt/homebrew/opt/patchbay-voice-server)
+BREW=$(command -v brew)
+PB_PREFIX=$("$BREW" --prefix patchbay-voice-server 2>/dev/null || echo /opt/homebrew/opt/patchbay-voice-server)
 PB_LIBEXEC=$(cd "$PB_PREFIX/libexec" && pwd)
 
 TEST_IMPORTS=(
@@ -43,11 +44,11 @@ TEST_IMPORTS=(
 )
 cd "$PB_LIBEXEC"
 for stmt in "${TEST_IMPORTS[@]}"; do
-    ERR=$(.venv/bin/python3 -c "$stmt" 2>&1 1>/dev/null) || true
+    IMPORT_ERR=$(GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c "$stmt" 2>&1) || true
     if GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c "$stmt" 2>/dev/null; then
         pass "import: ${stmt%%;*}"
     else
-        fail "import failed: ${stmt%%;*} — ${ERR}"
+        fail "import failed: ${stmt%%;*} — ${IMPORT_ERR}"
     fi
 done
 
@@ -72,6 +73,7 @@ TMP_DEV=$(mktemp -d)
 TMP_PROJ="${TMP_DEV}/smoke-test-proj"
 mkdir -p "$TMP_PROJ"
 LOG=$(mktemp)
+SERVER_PID=""
 cleanup() {
     if [[ -n "${SERVER_PID:-}" ]]; then
         kill "$SERVER_PID" 2>/dev/null || true
@@ -89,60 +91,77 @@ DEVELOPER_DIR="$TMP_DEV" \
 SERVER_PID=$!
 
 # Wait for server to be ready (up to 15s)
+SERVER_STARTED=false
 for i in $(seq 1 15); do
     if curl -sf "http://127.0.0.1:$PORT/api/chats" >/dev/null 2>&1; then
         pass "server started on port $PORT (pid $SERVER_PID)"
+        SERVER_STARTED=true
         break
     fi
     sleep 1
 done
-if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+if ! $SERVER_STARTED; then
     fail "server failed to start: $(cat "$LOG")"
 fi
 
-# Hit the API (empty chats list)
-RESP=$(curl -sf "http://127.0.0.1:$PORT/api/chats" 2>&1 || true)
-if echo "$RESP" | grep -q '"chats"'; then
-    pass "GET /api/chats returns valid JSON"
-else
-    fail "GET /api/chats failed: $RESP"
+# Only proceed with API tests if server started
+if $SERVER_STARTED; then
+    # Hit the API (empty chats list)
+    RESP=$(curl -sf "http://127.0.0.1:$PORT/api/chats" 2>&1 || true)
+    if echo "$RESP" | grep -q '"chats"'; then
+        pass "GET /api/chats returns valid JSON"
+    else
+        fail "GET /api/chats failed: $RESP"
+    fi
+
+    # Create a chat (POST)
+    CREATE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:$PORT/api/chats" \
+        -H "Content-Type: application/json" \
+        -d '{"project_dir": "smoke-test-proj"}' 2>&1 || true)
+    CREATE_RESP=$(curl -s -X POST "http://127.0.0.1:$PORT/api/chats" \
+        -H "Content-Type: application/json" \
+        -d '{"project_dir": "smoke-test-proj"}' 2>&1 || true)
+    if echo "$CREATE_RESP" | grep -q '"id"'; then
+        pass "POST /api/chats returns chat with id"
+        CHAT_ID=$(echo "$CREATE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+    else
+        fail "POST /api/chats (HTTP $CREATE_CODE): $CREATE_RESP"
+    fi
+
+    # List projects (should include smoke-test-proj)
+    PROJ_RESP=$(curl -sf "http://127.0.0.1:$PORT/api/projects" 2>&1 || true)
+    if echo "$PROJ_RESP" | grep -q 'smoke-test-proj'; then
+        pass "GET /api/projects lists smoke-test-proj"
+    else
+        fail "GET /api/projects failed: $PROJ_RESP"
+    fi
+
+    # Health check via /api/talk without input (should return 400 with detail)
+    TALK_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:$PORT/api/talk" -d "chat_id=$CHAT_ID" 2>&1 || true)
+    if [[ "$TALK_CODE" == "400" ]]; then
+        pass "POST /api/talk (no input) returns HTTP 400"
+    else
+        TALK_BODY=$(curl -s -X POST "http://127.0.0.1:$PORT/api/talk" -d "chat_id=$CHAT_ID" 2>&1 || true)
+        fail "POST /api/talk (no input) returned $TALK_CODE: $TALK_BODY"
+    fi
 fi
 
-# Create a chat (POST)
-CREATE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:$PORT/api/chats" \
-    -H "Content-Type: application/json" \
-    -d '{"project_dir": "smoke-test-proj"}' 2>&1 || true)
-CREATE_RESP=$(curl -s -X POST "http://127.0.0.1:$PORT/api/chats" \
-    -H "Content-Type: application/json" \
-    -d '{"project_dir": "smoke-test-proj"}' 2>&1 || true)
-if echo "$CREATE_RESP" | grep -q '"id"'; then
-    pass "POST /api/chats returns chat with id"
-    CHAT_ID=$(echo "$CREATE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-else
-    fail "POST /api/chats (HTTP $CREATE_CODE): $CREATE_RESP"
+# Kill the server and verify it's actually gone
+if [[ -n "${SERVER_PID:-}" ]]; then
+    kill "$SERVER_PID" 2>/dev/null || true
+    # Wait up to 5s for the process to disappear
+    for i in $(seq 1 5); do
+        if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+            pass "server stopped cleanly (pid $SERVER_PID terminated)"
+            break
+        fi
+        sleep 1
+    done
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+        fail "server did not stop after 5s (pid $SERVER_PID still alive)"
+        kill -9 "$SERVER_PID" 2>/dev/null || true
+    fi
 fi
-
-# List projects (should include smoke-test-proj)
-PROJ_RESP=$(curl -sf "http://127.0.0.1:$PORT/api/projects" 2>&1 || true)
-if echo "$PROJ_RESP" | grep -q 'smoke-test-proj'; then
-    pass "GET /api/projects lists smoke-test-proj"
-else
-    fail "GET /api/projects failed: $PROJ_RESP"
-fi
-
-# Health check via /api/talk without input (should return 400 with detail)
-TALK_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:$PORT/api/talk" -d "chat_id=$CHAT_ID" 2>&1 || true)
-if [[ "$TALK_CODE" == "400" ]]; then
-    pass "POST /api/talk (no input) returns HTTP 400"
-else
-    TALK_BODY=$(curl -s -X POST "http://127.0.0.1:$PORT/api/talk" -d "chat_id=$CHAT_ID" 2>&1 || true)
-    fail "POST /api/talk (no input) returned $TALK_CODE: $TALK_BODY"
-fi
-
-# Kill the server
-kill "$SERVER_PID" 2>/dev/null || true
-wait "$SERVER_PID" 2>/dev/null || true
-pass "server stopped cleanly"
 
 # ── Results ───────────────────────────────────────────────────────────────────
 echo ""
