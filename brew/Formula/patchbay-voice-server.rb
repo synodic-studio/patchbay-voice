@@ -22,14 +22,14 @@ class PatchbayVoiceServer < Formula
     venv = virtualenv_create(libexec, "python3.14")
     # Install deps via pip inside the venv (Homebrew's pip_install uses --no-deps)
     pip = "#{libexec}/bin/pip"
-    system pip, "install", "--quiet", "starlette>=0.46.0"
-    system pip, "install", "--quiet", "fastapi>=0.138.1"
-    system pip, "install", "--quiet", "uvicorn>=0.49.0"
-    system pip, "install", "--quiet", "faster-whisper>=1.2.1"
-    system pip, "install", "--quiet", "python-multipart>=0.0.32"
-    system pip, "install", "--quiet", "httpx>=0.28.0"
-    system pip, "install", "--quiet", "google-auth>=2.40.0"
-    system pip, "install", "--quiet", "requests>=2.32.0"
+    system pip, "install", "--quiet", "starlette"
+    system pip, "install", "--quiet", "fastapi"
+    system pip, "install", "--quiet", "uvicorn"
+    system pip, "install", "--quiet", "faster-whisper"
+    system pip, "install", "--quiet", "python-multipart"
+    system pip, "install", "--quiet", "httpx"
+    system pip, "install", "--quiet", "google-auth"
+    system pip, "install", "--quiet", "requests"
 
     # Mark bundled dylibs immutable so Homebrew's post-install fixup
     # doesn't fail on oversize Mach-O headers (faster-whisper bundles ffmpeg
@@ -116,7 +116,6 @@ class PatchbayVoiceServer < Formula
     assert_predicate libexec/"bin/uvicorn", :exist?
     assert_predicate libexec/"web/index.html", :exist?
     assert_predicate libexec/"pi/tools.ts", :exist?
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python3 -c \"from chats import Chat; print('ok')\"")
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python3 -c \"from pi_runner import _parse_events; print('ok')\"")
+    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python3 -c \"from tts import _split_sentences; print('ok')\"")
   end
 end
