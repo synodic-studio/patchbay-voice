@@ -2,134 +2,218 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Patchbay Voice</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0f0f0f;
-  --surface: #1a1a1a;
-  --surface-2: #242424;
-  --surface-3: #2e2e2e;
-  --border: #2e2e2e;
-  --accent: #3b82f6;
-  --user-bubble: #1c3356;
-  --text: #e2e8f0;
-  --text-muted: #64748b;
-  --text-dim: #94a3b8;
-  --red: #ef4444;
-  --green: #22c55e;
-  --radius: 10px;
+  --bg:        #000000;
+  --card:      #1c1c1e;
+  --card2:     #2c2c2e;
+  --sep:       rgba(84,84,88,0.65);
+  --blue:      #0a84ff;
+  --green:     #30d158;
+  --red:       #ff453a;
+  --white:     #ffffff;
+  --label:     #ffffff;
+  --label2:    #ebebf599;
+  --label3:    #ebebf54d;
+  --mono:      'SF Mono','Fira Mono','Menlo',monospace;
+  --sans:      -apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;
+  --user-bg:   #1b3a6b;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html, body {
   height: 100%;
   background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
+  color: var(--label);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.4;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
 }
 
-.view {
+/* ── Layout shells ───────────────────────────────────────── */
+.screen {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
-  max-width: 640px;
+  max-width: 480px;
   margin: 0 auto;
+  overflow: hidden;
 }
 
-.hidden { display: none !important; }
+.screen.hidden { display: none !important; }
 
-/* ── Header ──────────────────────────────────────────── */
-.hdr {
+/* ── Nav bar ─────────────────────────────────────────────── */
+.nav {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  gap: 6px;
+  padding: 10px 16px 6px;
+  gap: 8px;
   flex-shrink: 0;
   min-height: 52px;
 }
 
-.hdr-title {
+.nav-title {
   flex: 1;
-  font-size: 16px;
+  text-align: center;
+}
+
+.nav-title h2 {
+  font-size: 17px;
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   letter-spacing: -0.01em;
+  color: var(--label);
 }
 
-/* ── Buttons ─────────────────────────────────────────── */
-button {
-  background: none;
-  border: none;
-  color: var(--text);
-  cursor: pointer;
-  border-radius: 8px;
-  font-size: 15px;
-  transition: background 0.12s;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  touch-action: manipulation;
-}
-
-.btn-icon {
-  width: 36px;
-  height: 36px;
+.nav-title p {
+  font-size: 12px;
+  color: var(--label2);
+  font-family: var(--mono);
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
+  margin-top: 1px;
+}
+
+.nav-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  font-size: 19px;
+  background: var(--card2);
   flex-shrink: 0;
 }
 
-.btn-icon:hover { background: var(--surface-2); }
+.nav-dot.active { background: var(--green); }
 
-.btn-text {
-  color: var(--accent);
-  font-size: 15px;
-  font-weight: 500;
-  padding: 6px 10px;
+/* Large title screens */
+.large-title {
+  padding: 4px 20px 16px;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
 }
 
-.btn-text:hover { background: var(--surface-2); }
-.btn-danger { color: var(--red) !important; }
+/* ── Buttons ─────────────────────────────────────────────── */
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+  font-family: var(--sans);
+}
 
-/* ── Sessions ────────────────────────────────────────── */
-#sessions-main {
+.btn-nav {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--blue);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-nav:active { opacity: 0.6; }
+.btn-nav.danger { color: var(--red); }
+
+.btn-icon-round {
+  width: 38px;
+  height: 38px;
+  background: var(--card);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--blue);
+}
+
+.btn-icon-round:active { opacity: 0.6; }
+.btn-icon-round svg { display: block; }
+
+/* ── Search bar ──────────────────────────────────────────── */
+.search-wrap {
+  padding: 0 16px 12px;
+  flex-shrink: 0;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+.search-bar svg { color: var(--label3); flex-shrink: 0; }
+
+.search-bar input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 17px;
+  color: var(--label);
+  font-family: var(--sans);
+}
+
+.search-bar input::placeholder { color: var(--label3); }
+
+/* ── Grouped card list ───────────────────────────────────── */
+.scroll-area {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  padding: 0 16px 24px;
 }
 
-.session-item {
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.card-row {
   display: flex;
   align-items: center;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
+  padding: 12px 16px;
   gap: 12px;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  min-height: 52px;
+  position: relative;
 }
 
-.session-item:hover { background: var(--surface); }
-.session-item:active { background: var(--surface-2); }
+.card-row + .card-row::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 16px; right: 0;
+  height: 1px;
+  background: var(--sep);
+}
 
+.card-row:active { background: var(--card2); }
+.card-row.no-press:active { background: none; }
+
+/* Session row */
 .session-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--surface-3);
+  background: var(--card2);
   flex-shrink: 0;
+  border: 0;
 }
 
 .session-dot.active { background: var(--green); }
@@ -137,33 +221,60 @@ button {
 .session-info { flex: 1; min-width: 0; }
 
 .session-name {
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--blue);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.session-meta {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-family: 'SF Mono', 'Fira Mono', 'Menlo', monospace;
+.session-path {
+  font-size: 13px;
+  color: var(--label3);
+  font-family: var(--mono);
   margin-top: 1px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.session-btn {
-  font-size: 16px;
-  color: var(--text-muted);
-  padding: 6px;
-  border-radius: 8px;
+.session-time {
+  font-size: 15px;
+  color: var(--label2);
+  flex-shrink: 0;
 }
 
-.session-btn:hover { background: var(--surface-2); color: var(--text); }
+.session-actions {
+  display: flex;
+  gap: 4px;
+}
 
-/* ── Empty state ─────────────────────────────────────── */
+.btn-session-action {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--label2);
+  font-size: 16px;
+}
+
+.btn-session-action:active { background: var(--card2); color: var(--label); }
+.btn-session-action.danger:active { color: var(--red); }
+
+/* Section header */
+.section-hdr {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--label2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 18px 16px 6px;
+}
+
+/* Empty state */
 .empty {
   display: flex;
   flex-direction: column;
@@ -171,562 +282,689 @@ button {
   justify-content: center;
   gap: 10px;
   padding: 80px 24px;
-  color: var(--text-muted);
+  color: var(--label3);
   text-align: center;
 }
 
-.empty-icon { font-size: 40px; opacity: 0.35; }
+.empty-icon { font-size: 44px; }
 .empty p { font-size: 15px; }
 
-/* ── Messages ────────────────────────────────────────── */
-#messages {
+/* ── Messages ────────────────────────────────────────────── */
+#messages-scroll {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 14px 8px;
+  padding: 8px 16px 4px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
-.msg {
+.msg-row {
   display: flex;
   flex-direction: column;
-  max-width: 82%;
-  gap: 3px;
+  max-width: 78%;
 }
 
-.msg.user { align-self: flex-end; align-items: flex-end; }
-.msg.assistant { align-self: flex-start; align-items: flex-start; }
+.msg-row.user { align-self: flex-end; align-items: flex-end; }
+.msg-row.assistant { align-self: flex-start; align-items: flex-start; }
 
 .bubble {
   padding: 10px 14px;
   border-radius: 18px;
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 17px;
+  line-height: 1.4;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
-.msg.user .bubble {
-  background: var(--user-bubble);
+.msg-row.user .bubble {
+  background: var(--user-bg);
   border-bottom-right-radius: 4px;
+  color: var(--label);
 }
 
-.msg.assistant .bubble {
-  background: var(--surface);
-  border: 1px solid var(--border);
+.msg-row.assistant .bubble {
+  background: var(--card);
   border-bottom-left-radius: 4px;
-  color: var(--text);
-}
-
-.msg-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  padding: 0 4px;
+  color: var(--label);
 }
 
 .status-pill {
   align-self: center;
-  font-size: 13px;
-  color: var(--text-muted);
-  padding: 5px 14px;
-  background: var(--surface-2);
+  font-size: 14px;
+  color: var(--label2);
+  padding: 5px 16px;
+  background: var(--card);
   border-radius: 20px;
+  margin: 4px 0;
 }
 
-/* ── Talk footer ─────────────────────────────────────── */
-.talk-footer {
+/* ── Talk bottom bar ─────────────────────────────────────── */
+.talk-bar {
   flex-shrink: 0;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
+  padding: 12px 24px calc(16px + var(--safe-bottom));
 }
 
-#talk-controls {
+.talk-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 28px 12px;
-  gap: 8px;
 }
 
 #mic-btn {
-  width: 68px;
-  height: 68px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  background: var(--accent);
-  color: white;
-  font-size: 26px;
+  background: var(--blue);
+  color: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 3px 14px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 20px rgba(10,132,255,0.4);
   transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
   touch-action: none;
+  flex-shrink: 0;
 }
 
-#mic-btn:hover { background: #2563eb; }
+#mic-btn:active { transform: scale(0.96); }
 
 #mic-btn.recording {
   background: var(--red);
-  box-shadow: 0 3px 20px rgba(239, 68, 68, 0.55);
-  animation: mic-pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 4px 24px rgba(255,69,58,0.5);
+  animation: pulse 1.2s ease-in-out infinite;
 }
 
 #mic-btn.thinking {
-  background: var(--surface-3);
+  background: var(--card2);
   box-shadow: none;
   pointer-events: none;
 }
 
-#mic-btn.thinking .mic-icon { opacity: 0.4; }
+#mic-btn.thinking svg { opacity: 0.4; }
 
-@keyframes mic-pulse {
+@keyframes pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.07); }
+  50% { transform: scale(1.06); }
 }
 
-.ctrl-btn {
-  width: 44px;
-  height: 44px;
+.ctrl-side {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--blue);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  font-size: 20px;
-  color: var(--text-muted);
-  transition: color 0.15s;
+  color: var(--white);
+  flex-shrink: 0;
+  transition: opacity 0.15s;
 }
 
-.ctrl-btn:hover { background: var(--surface-2); color: var(--text); }
-.ctrl-btn.active { color: var(--accent); }
+.ctrl-side:active { opacity: 0.7; }
+.ctrl-side.muted { background: var(--card2); }
 
-/* ── Text input bar ──────────────────────────────────── */
-#text-bar {
+#keyboard-side {
+  background: var(--card2);
+  color: var(--label2);
+}
+
+#keyboard-side.text-mode {
+  background: var(--blue);
+  color: var(--white);
+}
+
+/* Text input bar */
+.text-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px 10px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
-#text-input {
+.text-bar.hidden { display: none; }
+
+.text-bar input {
   flex: 1;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: var(--card);
+  border: none;
   border-radius: 22px;
   padding: 10px 16px;
-  color: var(--text);
-  font-size: 15px;
+  color: var(--label);
+  font-size: 17px;
   outline: none;
-  font-family: inherit;
+  font-family: var(--sans);
 }
 
-#text-input:focus { border-color: var(--accent); }
-#text-input::placeholder { color: var(--text-muted); }
+.text-bar input::placeholder { color: var(--label3); }
 
-/* ── Settings panel ──────────────────────────────────── */
-#settings-view {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: var(--bg);
-  max-width: 640px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-scroll { overflow-y: auto; flex: 1; padding-bottom: 40px; }
-
-.settings-section {
-  padding: 0 16px;
-  margin-top: 24px;
-}
-
-.settings-label {
-  font-size: 11px;
+.btn-send {
+  color: var(--blue);
+  font-size: 17px;
   font-weight: 600;
-  letter-spacing: 0.07em;
+  padding: 8px 4px;
+  white-space: nowrap;
+}
+
+.btn-send:active { opacity: 0.6; }
+
+/* ── Settings ────────────────────────────────────────────── */
+.settings-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--label2);
   text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 6px;
+  letter-spacing: 0.04em;
+  padding: 18px 20px 6px;
 }
 
 .settings-card {
-  background: var(--surface);
-  border-radius: var(--radius);
+  margin: 0 16px 8px;
+  background: var(--card);
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--border);
 }
 
 .s-row {
   display: flex;
   align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-  gap: 10px;
-  min-height: 48px;
+  padding: 12px 16px;
+  gap: 12px;
+  min-height: 52px;
+  position: relative;
 }
 
-.s-row:last-child { border-bottom: none; }
+.s-row + .s-row::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 16px; right: 0;
+  height: 1px;
+  background: var(--sep);
+}
 
-.s-row label {
-  font-size: 15px;
+.s-label {
+  font-size: 17px;
+  color: var(--label);
   flex: 1;
 }
 
-.s-row input[type="text"] {
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  font-size: 14px;
-  text-align: right;
-  outline: none;
-  min-width: 0;
-  width: 160px;
-  font-family: inherit;
+.s-value {
+  font-size: 17px;
+  color: var(--label2);
 }
 
-.s-row input[type="text"]:focus { color: var(--text); }
+.s-select {
+  background: none;
+  border: none;
+  color: var(--label2);
+  font-size: 17px;
+  font-family: var(--sans);
+  outline: none;
+  text-align: right;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
 
-.s-row select {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 5px 10px;
-  color: var(--text);
-  font-size: 14px;
+.s-select option { background: var(--card2); }
+
+.s-chevron { color: var(--label3); margin-left: 4px; }
+
+.s-input {
+  background: none;
+  border: none;
+  color: var(--label2);
+  font-size: 17px;
+  font-family: var(--mono);
+  outline: none;
+  text-align: right;
+  min-width: 0;
+  width: 180px;
+}
+
+.s-input:focus { color: var(--label); }
+.s-input::placeholder { color: var(--label3); }
+
+/* Rate slider row */
+.s-rate-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 4px;
+  background: var(--card2);
+  border-radius: 2px;
   outline: none;
   cursor: pointer;
 }
 
-.s-row input[type="range"] {
-  width: 110px;
-  accent-color: var(--accent);
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  cursor: pointer;
 }
 
 .s-rate-val {
-  font-size: 13px;
-  color: var(--text-dim);
-  min-width: 34px;
+  font-size: 15px;
+  color: var(--label2);
+  min-width: 36px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* Toggle */
-.toggle { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
-.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+/* ── iOS-style toggle ────────────────────────────────────── */
+.toggle-wrap {
+  position: relative;
+  width: 51px;
+  height: 31px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle-wrap input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
 .toggle-track {
   display: block;
-  width: 100%; height: 100%;
-  border-radius: 13px;
-  background: var(--surface-3);
+  width: 51px;
+  height: 31px;
+  border-radius: 15.5px;
+  background: var(--card2);
+  transition: background 0.22s ease;
+  position: relative;
   cursor: pointer;
-  transition: background 0.2s;
 }
-.toggle input:checked + .toggle-track { background: var(--accent); }
-.toggle-thumb {
+
+.toggle-track::after {
+  content: '';
   position: absolute;
-  top: 3px; left: 3px;
-  width: 20px; height: 20px;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
   border-radius: 50%;
   background: #fff;
-  transition: left 0.2s;
-  pointer-events: none;
-  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25);
+  transition: left 0.22s ease;
 }
-.toggle input:checked ~ .toggle-thumb { left: 21px; }
 
-/* ── Modal ───────────────────────────────────────────── */
-.modal-bg {
+.toggle-wrap input:checked + .toggle-track {
+  background: var(--green);
+}
+
+.toggle-wrap input:checked + .toggle-track::after {
+  left: 22px;
+}
+
+/* ── Model picker ────────────────────────────────────────── */
+.model-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  position: relative;
+}
+
+.model-option + .model-option::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 16px; right: 0;
+  height: 1px;
+  background: var(--sep);
+}
+
+.model-option:active { background: var(--card2); }
+
+.model-name {
+  font-size: 17px;
+  color: var(--blue);
+}
+
+.model-check {
+  color: var(--blue);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.model-check.hidden { visibility: hidden; }
+
+/* ── Sheet modal ─────────────────────────────────────────── */
+.sheet-bg {
   position: fixed;
   inset: 0;
-  z-index: 200;
-  background: rgba(0,0,0,.65);
+  z-index: 100;
+  background: rgba(0,0,0,0.6);
   display: flex;
   align-items: flex-end;
   justify-content: center;
 }
 
-.modal-sheet {
-  background: var(--surface);
-  border-radius: 16px 16px 0 0;
+.sheet-bg.hidden { display: none !important; }
+
+.sheet {
+  background: #1c1c1e;
+  border-radius: 14px 14px 0 0;
   width: 100%;
-  max-width: 640px;
-  max-height: 72vh;
+  max-width: 480px;
+  max-height: 75vh;
   display: flex;
   flex-direction: column;
+  padding-bottom: var(--safe-bottom);
 }
 
-.modal-hdr {
+.sheet-hdr {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--sep);
   flex-shrink: 0;
 }
 
-.modal-hdr h2 { flex: 1; font-size: 15px; font-weight: 600; }
+.sheet-hdr h2 {
+  flex: 1;
+  font-size: 17px;
+  font-weight: 600;
+}
 
-.modal-list { overflow-y: auto; flex: 1; }
+.sheet-list {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+}
 
-.modal-item {
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--border);
+.sheet-item {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--sep);
+  font-size: 17px;
+  font-family: var(--mono);
+  color: var(--label);
   cursor: pointer;
-  font-size: 15px;
-  font-family: 'SF Mono', 'Fira Mono', monospace;
   -webkit-tap-highlight-color: transparent;
 }
 
-.modal-item:hover { background: var(--surface-2); }
-.modal-item:last-child { border-bottom: none; }
+.sheet-item:last-child { border-bottom: none; }
+.sheet-item:active { background: var(--card2); }
 
-/* ── Scrollbar ───────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; }
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--card2); border-radius: 2px; }
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════ SESSIONS VIEW ════════════════════ -->
-<div id="sessions-view" class="view">
-  <div class="hdr">
-    <span class="hdr-title">Patchbay Voice</span>
-    <button class="btn-icon" id="settings-open-btn" title="Settings" aria-label="Settings">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
-    </button>
-    <button class="btn-text" id="new-session-btn">New</button>
+<!-- ═══════════ SESSIONS ═══════════ -->
+<div id="sessions-screen" class="screen">
+  <div class="nav">
+    <div style="width:70px"></div>
+    <div style="flex:1;text-align:center;font-size:17px;font-weight:600">Patchbay Voice</div>
+    <div style="display:flex;gap:6px;width:70px;justify-content:flex-end">
+      <button class="btn-icon-round" id="settings-btn" aria-label="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <button class="btn-nav" id="new-btn">＋</button>
+    </div>
   </div>
-  <div id="sessions-main" class="view-main"></div>
+
+  <div class="large-title">Sessions</div>
+
+  <div class="search-wrap">
+    <div class="search-bar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="search-input" type="search" placeholder="Search" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="scroll-area" id="sessions-list"></div>
 </div>
 
-<!-- ═══════════════════ TALK VIEW ═════════════════════════ -->
-<div id="talk-view" class="view hidden">
-  <div class="hdr">
-    <button class="btn-icon" id="back-btn" aria-label="Back">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
+<!-- ═══════════ TALK ═══════════════ -->
+<div id="talk-screen" class="screen hidden">
+  <div class="nav">
+    <button class="btn-icon-round" id="back-btn" aria-label="Back">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
-    <span class="hdr-title" id="talk-title"></span>
-    <button class="btn-text btn-danger" id="reset-btn">Reset</button>
+    <div class="nav-title">
+      <h2 id="talk-title-name"></h2>
+      <p><span class="nav-dot" id="talk-nav-dot"></span><span id="talk-title-path"></span></p>
+    </div>
+    <button class="btn-nav danger" id="reset-btn">Reset</button>
   </div>
-  <div id="messages"></div>
-  <div class="talk-footer">
-    <div id="talk-controls">
-      <button class="ctrl-btn" id="keyboard-btn" title="Toggle keyboard" aria-label="Toggle keyboard">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>
-        </svg>
+
+  <div id="messages-scroll"></div>
+
+  <div class="talk-bar">
+    <div class="talk-controls">
+      <button class="ctrl-side" id="keyboard-side" aria-label="Keyboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>
       </button>
+
       <button id="mic-btn" aria-label="Hold to talk">
-        <span class="mic-icon">🎤</span>
+        <svg id="mic-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
       </button>
-      <button class="ctrl-btn active" id="speaker-btn" title="Toggle audio" aria-label="Toggle audio">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" id="speaker-icon">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-        </svg>
+
+      <button class="ctrl-side" id="speaker-side" aria-label="Toggle audio">
+        <svg id="speaker-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
       </button>
     </div>
-    <div id="text-bar" class="hidden">
-      <input id="text-input" type="text" placeholder="Type a message…" autocomplete="off" enterkeyhint="send">
-      <button class="btn-text" id="send-btn">Send</button>
+
+    <div class="text-bar hidden" id="text-bar">
+      <input id="text-input" type="text" placeholder="Message…" autocomplete="off" enterkeyhint="send">
+      <button class="btn-send" id="send-btn">Send</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════ SETTINGS VIEW ════════════════════ -->
-<div id="settings-view" class="hidden">
-  <div class="hdr">
-    <span class="hdr-title">Settings</span>
-    <button class="btn-text" id="settings-close-btn">Done</button>
+<!-- ═══════════ SETTINGS ══════════ -->
+<div id="settings-screen" class="screen hidden">
+  <div class="nav">
+    <div style="width:60px"></div>
+    <div style="flex:1;text-align:center"></div>
+    <button class="btn-nav" id="settings-done-btn">Done</button>
   </div>
-  <div class="settings-scroll">
-    <div class="settings-section">
-      <div class="settings-label">Voice</div>
-      <div class="settings-card">
-        <div class="s-row">
-          <label for="set-provider">TTS provider</label>
-          <select id="set-provider">
-            <option value="say">macOS say</option>
-            <option value="google">Google Cloud</option>
-          </select>
-        </div>
-        <div class="s-row">
-          <label>Speaking rate</label>
-          <input type="range" id="set-rate" min="0.5" max="2.0" step="0.1">
+
+  <div class="large-title">Settings</div>
+
+  <div class="scroll-area">
+    <div class="settings-label">Voice</div>
+    <div class="settings-card">
+      <div class="s-row no-press">
+        <span class="s-label">Spoken replies</span>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="set-audio-resp" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="s-row no-press">
+        <span class="s-label">Provider</span>
+        <select class="s-select" id="set-provider">
+          <option value="say">macOS Say</option>
+          <option value="google">Google Cloud</option>
+        </select>
+        <svg class="s-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="s-row no-press">
+        <span class="s-label">Speaking rate</span>
+        <div class="s-rate-wrap">
+          <input type="range" id="set-rate" min="0.5" max="2.0" step="0.1" value="1.0">
           <span class="s-rate-val" id="rate-val">1.0×</span>
         </div>
-        <div class="s-row">
-          <label for="set-audio-resp">Spoken replies</label>
-          <label class="toggle">
-            <input type="checkbox" id="set-audio-resp" checked>
-            <span class="toggle-track"></span>
-            <span class="toggle-thumb"></span>
-          </label>
-        </div>
       </div>
     </div>
 
-    <div class="settings-section">
-      <div class="settings-label">Agent</div>
-      <div class="settings-card">
-        <div class="s-row">
-          <label for="set-model">Model</label>
-          <input type="text" id="set-model" placeholder="small">
-        </div>
-        <div class="s-row">
-          <label for="set-save-path">Save path</label>
-          <input type="text" id="set-save-path" placeholder="docs/patchbay/">
-        </div>
-        <div class="s-row">
-          <label for="set-auto-commit">Auto commit</label>
-          <label class="toggle">
-            <input type="checkbox" id="set-auto-commit">
-            <span class="toggle-track"></span>
-            <span class="toggle-thumb"></span>
-          </label>
-        </div>
+    <div class="settings-label">Model</div>
+    <div class="settings-card" id="model-card">
+      <div class="model-option" data-model="small">
+        <span class="model-name">Small</span>
+        <span class="model-check">✓</span>
+      </div>
+      <div class="model-option" data-model="medium">
+        <span class="model-name">Medium</span>
+        <span class="model-check hidden">✓</span>
+      </div>
+      <div class="model-option" data-model="large">
+        <span class="model-name">Large</span>
+        <span class="model-check hidden">✓</span>
+      </div>
+      <div class="s-row no-press" style="padding:8px 16px">
+        <input class="s-input" id="set-model-custom" placeholder="Custom LiteLLM alias…" style="text-align:left;width:100%">
+      </div>
+    </div>
+
+    <div class="settings-label">Files</div>
+    <div class="settings-card">
+      <div class="s-row no-press">
+        <span class="s-label">Save path</span>
+        <input class="s-input" id="set-save-path" placeholder="docs/patchbay/" value="docs/patchbay/">
+      </div>
+      <div class="s-row no-press">
+        <span class="s-label">Auto-commit to Git</span>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="set-auto-commit">
+          <span class="toggle-track"></span>
+        </label>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════ NEW SESSION MODAL ════════════════ -->
-<div id="new-session-modal" class="modal-bg hidden">
-  <div class="modal-sheet">
-    <div class="modal-hdr">
+<!-- ═══════════ PROJECT SHEET ═════ -->
+<div id="project-sheet" class="sheet-bg hidden">
+  <div class="sheet">
+    <div class="sheet-hdr">
       <h2>Select Project</h2>
-      <button class="btn-icon" id="modal-close-btn">✕</button>
+      <button class="btn-icon-round" id="sheet-close-btn" style="background:var(--card2)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
-    <div id="projects-list" class="modal-list"></div>
+    <div class="sheet-list" id="projects-list"></div>
   </div>
 </div>
 
 <script>
 'use strict';
 
-// ── Settings ─────────────────────────────────────────────────────────────────
-
+// ── Settings ──────────────────────────────────────────────────────────────────
 const DEFAULTS = {
   ttsProvider: 'say',
   speakingRate: 1.0,
   audioResponse: true,
   savePath: 'docs/patchbay/',
-  model: '',
+  model: 'small',
   autoCommit: false,
 };
 
-function loadSettings() {
-  try {
-    const s = JSON.parse(localStorage.getItem('pvSettings') || '{}');
-    return { ...DEFAULTS, ...s };
-  } catch { return { ...DEFAULTS }; }
-}
+let settings = (() => {
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('pvSettings') || '{}') }; }
+  catch { return { ...DEFAULTS }; }
+})();
 
-function saveSettings(s) {
-  localStorage.setItem('pvSettings', JSON.stringify(s));
-}
-
-let settings = loadSettings();
+function saveSettings() { localStorage.setItem('pvSettings', JSON.stringify(settings)); }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-
 let activeChatId = null;
-let activeProjectDir = null;
-let localMessages = {}; // chatId → [{role, text}]
+let activeChatDir = null;
+let localMessages = {};
 let keyboardMode = false;
 let audioEnabled = true;
+let audioEl = null;
+let audioQueue = [];
 let micRecorder = null;
 let micChunks = [];
-let audioQueue = [];
-let audioEl = null;
+let allChats = [];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function reltime(ts) {
-  if (!ts) return '';
-  const diff = Date.now() / 1000 - ts;
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
+// ── API ───────────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
-  const opts = { method, headers: {} };
-  if (body instanceof FormData) {
-    opts.body = body;
-  } else if (body) {
-    opts.headers['Content-Type'] = 'application/json';
-    opts.body = JSON.stringify(body);
-  }
+  const opts = { method };
+  if (body instanceof FormData) { opts.body = body; }
+  else if (body) { opts.headers = {'Content-Type':'application/json'}; opts.body = JSON.stringify(body); }
   const r = await fetch(path, opts);
-  if (!r.ok) {
-    const msg = (await r.json().catch(() => ({detail: r.statusText}))).detail || r.statusText;
-    throw new Error(msg);
-  }
+  if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || r.statusText); }
   return r.json();
 }
 
-function scrollMessages() {
-  const el = document.getElementById('messages');
-  el.scrollTop = el.scrollHeight;
+// ── Time ──────────────────────────────────────────────────────────────────────
+function reltime(ts) {
+  if (!ts) return '';
+  const s = Date.now()/1000 - ts;
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s/60)} min. ago`;
+  if (s < 86400) return `${Math.floor(s/3600)} hr. ago`;
+  return `${Math.floor(s/86400)} day${Math.floor(s/86400)>1?'s':''} ago`;
 }
 
-// ── View switching ────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-function showView(name) {
-  ['sessions-view', 'talk-view', 'settings-view'].forEach(id => {
-    document.getElementById(id).classList.toggle('hidden', id !== name + '-view');
+// ── Views ─────────────────────────────────────────────────────────────────────
+function showScreen(name) {
+  ['sessions','talk','settings'].forEach(n => {
+    document.getElementById(n+'-screen').classList.toggle('hidden', n !== name);
   });
 }
 
-// ── Sessions view ─────────────────────────────────────────────────────────────
-
+// ── Sessions ──────────────────────────────────────────────────────────────────
 async function loadSessions() {
-  const container = document.getElementById('sessions-main');
   try {
     const data = await api('GET', '/api/chats');
-    renderSessions(data.chats || []);
-  } catch (e) {
-    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><p>${e.message}</p></div>`;
+    allChats = data.chats || [];
+    renderSessions(allChats);
+  } catch(e) {
+    document.getElementById('sessions-list').innerHTML =
+      `<div class="empty"><div class="empty-icon">⚠️</div><p>${esc(e.message)}</p></div>`;
   }
 }
 
 function renderSessions(chats) {
-  const container = document.getElementById('sessions-main');
-  if (!chats.length) {
-    container.innerHTML = `<div class="empty"><div class="empty-icon">🎤</div><p>No sessions yet.<br>Tap <strong>New</strong> to create one.</p></div>`;
+  const el = document.getElementById('sessions-list');
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const filtered = q ? chats.filter(c => c.project_dir.toLowerCase().includes(q)) : chats;
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🎤</div><p>${
+      q ? 'No matching sessions.' : 'No sessions yet.\nTap + to create one.'
+    }</p></div>`;
     return;
   }
-  container.innerHTML = chats.map(c => `
-    <div class="session-item" data-id="${c.id}" data-dir="${c.project_dir}">
+
+  el.innerHTML = `<div class="card">${filtered.map(c => `
+    <div class="card-row" data-id="${c.id}" data-dir="${esc(c.project_dir)}">
       <div class="session-dot ${c.pi_session_id ? 'active' : ''}"></div>
       <div class="session-info">
-        <div class="session-name">${c.project_dir}</div>
-        <div class="session-meta">${reltime(c.last_active)}</div>
+        <div class="session-name">${esc(c.project_dir)}</div>
+        <div class="session-path">${esc(c.project_dir)}</div>
       </div>
-      <button class="session-btn" data-action="reset" data-id="${c.id}" title="Reset context">↺</button>
-      <button class="session-btn" data-action="delete" data-id="${c.id}" title="Delete session">✕</button>
-    </div>`).join('');
+      <span class="session-time">${reltime(c.last_active)}</span>
+      <div class="session-actions">
+        <button class="btn-session-action" data-action="reset" data-id="${c.id}" title="Reset">↺</button>
+        <button class="btn-session-action danger" data-action="delete" data-id="${c.id}" title="Delete">✕</button>
+      </div>
+    </div>`).join('')}</div>`;
 
-  container.querySelectorAll('.session-item').forEach(el => {
-    el.addEventListener('click', e => {
+  el.querySelectorAll('.card-row').forEach(row => {
+    row.addEventListener('click', e => {
       const btn = e.target.closest('[data-action]');
       if (btn) {
         e.stopPropagation();
-        const { action, id } = btn.dataset;
-        if (action === 'delete') deleteSession(id);
-        else if (action === 'reset') resetSession(id);
+        if (btn.dataset.action === 'delete') deleteSession(btn.dataset.id);
+        else resetSession(btn.dataset.id);
         return;
       }
-      openChat(el.dataset.id, el.dataset.dir);
+      openChat(row.dataset.id, row.dataset.dir);
     });
   });
 }
@@ -741,66 +979,64 @@ async function deleteSession(id) {
 async function resetSession(id) {
   await api('POST', `/api/chats/${id}/reset`).catch(e => alert(e.message));
   localMessages[id] = [];
+  if (activeChatId === id) renderMessages();
   loadSessions();
 }
 
-// ── New session modal ─────────────────────────────────────────────────────────
+document.getElementById('search-input').addEventListener('input', () => renderSessions(allChats));
 
-async function openNewSessionModal() {
-  document.getElementById('new-session-modal').classList.remove('hidden');
+// ── New session sheet ─────────────────────────────────────────────────────────
+async function openProjectSheet() {
+  document.getElementById('project-sheet').classList.remove('hidden');
   const list = document.getElementById('projects-list');
-  list.innerHTML = '<div class="modal-item" style="color:var(--text-muted)">Loading…</div>';
+  list.innerHTML = '<div class="sheet-item" style="color:var(--label2)">Loading…</div>';
   try {
     const data = await api('GET', '/api/projects');
     list.innerHTML = (data.projects || []).map(p =>
-      `<div class="modal-item" data-dir="${p}">${p}</div>`
+      `<div class="sheet-item" data-dir="${esc(p)}">${esc(p)}</div>`
     ).join('');
     list.querySelectorAll('[data-dir]').forEach(el => {
       el.addEventListener('click', () => createSession(el.dataset.dir));
     });
-  } catch (e) {
-    list.innerHTML = `<div class="modal-item" style="color:var(--red)">${e.message}</div>`;
+  } catch(e) {
+    list.innerHTML = `<div class="sheet-item" style="color:var(--red)">${esc(e.message)}</div>`;
   }
 }
 
 async function createSession(dir) {
-  document.getElementById('new-session-modal').classList.add('hidden');
+  document.getElementById('project-sheet').classList.add('hidden');
   try {
     const chat = await api('POST', '/api/chats', { project_dir: dir });
     openChat(chat.id, chat.project_dir);
-  } catch (e) {
-    alert(e.message);
-  }
+  } catch(e) { alert(e.message); }
 }
 
-// ── Talk view ─────────────────────────────────────────────────────────────────
+function closeSheet() { document.getElementById('project-sheet').classList.add('hidden'); }
 
-function openChat(chatId, projectDir) {
+// ── Talk ──────────────────────────────────────────────────────────────────────
+function openChat(chatId, dir) {
   activeChatId = chatId;
-  activeProjectDir = projectDir;
-  document.getElementById('talk-title').textContent = projectDir;
+  activeChatDir = dir;
+  document.getElementById('talk-title-name').textContent = dir;
+  document.getElementById('talk-title-path').textContent = dir;
+  const chat = allChats.find(c => c.id === chatId);
+  document.getElementById('talk-nav-dot').classList.toggle('active', !!(chat && chat.pi_session_id));
   if (!localMessages[chatId]) localMessages[chatId] = [];
   renderMessages();
-  showView('talk');
-  requestAnimationFrame(scrollMessages);
+  showScreen('talk');
 }
 
 function renderMessages() {
-  const el = document.getElementById('messages');
+  const el = document.getElementById('messages-scroll');
   const msgs = localMessages[activeChatId] || [];
   if (!msgs.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🎤</div><p>Hold the mic to talk.</p></div>';
     return;
   }
-  el.innerHTML = msgs.map(m => `
-    <div class="msg ${m.role}">
-      <div class="bubble">${escapeHtml(m.text)}</div>
-    </div>`).join('');
-  requestAnimationFrame(scrollMessages);
-}
-
-function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  el.innerHTML = msgs.map(m =>
+    `<div class="msg-row ${m.role}"><div class="bubble">${esc(m.text)}</div></div>`
+  ).join('');
+  requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
 }
 
 function addMessage(role, text) {
@@ -809,8 +1045,8 @@ function addMessage(role, text) {
   renderMessages();
 }
 
-function setStatusPill(text) {
-  const el = document.getElementById('messages');
+function setStatus(text) {
+  const el = document.getElementById('messages-scroll');
   const existing = el.querySelector('.status-pill');
   if (existing) existing.remove();
   if (text) {
@@ -818,86 +1054,70 @@ function setStatusPill(text) {
     pill.className = 'status-pill';
     pill.textContent = text;
     el.appendChild(pill);
-    requestAnimationFrame(scrollMessages);
+    el.scrollTop = el.scrollHeight;
   }
 }
 
-// ── Mic recording ─────────────────────────────────────────────────────────────
-
+// ── Mic ───────────────────────────────────────────────────────────────────────
 function micStart() {
   const btn = document.getElementById('mic-btn');
   if (btn.classList.contains('thinking') || btn.classList.contains('recording')) return;
-
   navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-    const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', '']
+    const mime = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg','']
       .find(t => !t || MediaRecorder.isTypeSupported(t)) || '';
     micChunks = [];
-    micRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+    micRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
     micRecorder.ondataavailable = e => e.data.size && micChunks.push(e.data);
     micRecorder.onstop = () => {
       stream.getTracks().forEach(t => t.stop());
-      const ext = micRecorder.mimeType.includes('webm') ? 'webm' : 'ogg';
-      const blob = new Blob(micChunks, { type: micRecorder.mimeType });
-      sendAudio(blob, ext);
+      const ext = (micRecorder.mimeType || '').includes('webm') ? 'webm' : 'ogg';
+      sendAudio(new Blob(micChunks, { type: micRecorder.mimeType }), ext);
     };
     micRecorder.start();
     btn.classList.add('recording');
-    setStatusPill('Recording…');
-  }).catch(e => {
-    alert(`Microphone error: ${e.message}`);
-  });
+    setStatus('Recording…');
+  }).catch(e => alert(`Microphone: ${e.message}`));
 }
 
 function micStop() {
-  const btn = document.getElementById('mic-btn');
   if (!micRecorder || micRecorder.state !== 'recording') return;
   micRecorder.stop();
-  btn.classList.remove('recording');
-  setStatusPill(null);
+  document.getElementById('mic-btn').classList.remove('recording');
+  setStatus(null);
 }
 
 async function sendAudio(blob, ext) {
   const btn = document.getElementById('mic-btn');
   btn.classList.add('thinking');
-  setStatusPill('Thinking…');
-
+  setStatus('Thinking…');
   try {
-    const fd = buildFormData();
+    const fd = buildForm();
     fd.append('audio', blob, `audio.${ext}`);
-    const data = await api('POST', '/api/talk', fd);
-    onTurnResult(data);
-  } catch (e) {
-    setStatusPill(null);
+    onTurnResult(await api('POST', '/api/talk', fd), true);
+  } catch(e) {
+    setStatus(null);
     addMessage('assistant', `Error: ${e.message}`);
-  } finally {
-    btn.classList.remove('thinking');
-  }
+  } finally { btn.classList.remove('thinking'); }
 }
 
 async function sendText(text) {
   if (!text.trim()) return;
-  const input = document.getElementById('text-input');
-  input.value = '';
+  document.getElementById('text-input').value = '';
   addMessage('user', text);
-
   const btn = document.getElementById('mic-btn');
   btn.classList.add('thinking');
-  setStatusPill('Thinking…');
-
+  setStatus('Thinking…');
   try {
-    const fd = buildFormData();
+    const fd = buildForm();
     fd.append('text', text);
-    const data = await api('POST', '/api/talk', fd);
-    onTurnResult(data, false);
-  } catch (e) {
-    setStatusPill(null);
+    onTurnResult(await api('POST', '/api/talk', fd), false);
+  } catch(e) {
+    setStatus(null);
     addMessage('assistant', `Error: ${e.message}`);
-  } finally {
-    btn.classList.remove('thinking');
-  }
+  } finally { btn.classList.remove('thinking'); }
 }
 
-function buildFormData() {
+function buildForm() {
   const fd = new FormData();
   fd.append('chat_id', activeChatId);
   fd.append('audio_response', audioEnabled ? 'true' : 'false');
@@ -910,90 +1130,88 @@ function buildFormData() {
   return fd;
 }
 
-function onTurnResult(data, addTranscript = true) {
-  setStatusPill(null);
+function onTurnResult(data, addTranscript) {
+  setStatus(null);
   if (addTranscript && data.transcript) addMessage('user', data.transcript);
   if (data.reply) addMessage('assistant', data.reply);
-  if (audioEnabled && data.audio_urls && data.audio_urls.length) {
-    playAudioQueue(data.audio_urls);
-  }
+  if (audioEnabled && data.audio_urls && data.audio_urls.length) playQueue(data.audio_urls);
 }
 
-// ── Audio playback ────────────────────────────────────────────────────────────
-
-function playAudioQueue(urls) {
+// ── Audio ─────────────────────────────────────────────────────────────────────
+function playQueue(urls) {
   if (!audioEl) {
     audioEl = new Audio();
     audioEl.onended = () => {
       audioQueue.shift();
-      if (audioQueue.length) {
-        audioEl.src = audioQueue[0];
-        audioEl.play().catch(() => {});
-      }
+      if (audioQueue.length) { audioEl.src = audioQueue[0]; audioEl.play().catch(()=>{}); }
     };
   }
   audioQueue.push(...urls);
-  if (audioQueue.length === urls.length) {
-    audioEl.src = audioQueue[0];
-    audioEl.play().catch(() => {});
-  }
+  if (audioQueue.length === urls.length) { audioEl.src = audioQueue[0]; audioEl.play().catch(()=>{}); }
 }
 
-// ── Settings ─────────────────────────────────────────────────────────────────
-
-function bindSettings() {
-  const p = document.getElementById('set-provider');
-  const rate = document.getElementById('set-rate');
-  const rateVal = document.getElementById('rate-val');
-  const audioResp = document.getElementById('set-audio-resp');
-  const model = document.getElementById('set-model');
-  const savePath = document.getElementById('set-save-path');
-  const autoCommit = document.getElementById('set-auto-commit');
-
-  function applySettings() {
-    p.value = settings.ttsProvider;
-    rate.value = settings.speakingRate;
-    rateVal.textContent = `${settings.speakingRate.toFixed(1)}×`;
-    audioResp.checked = settings.audioResponse;
-    model.value = settings.model;
-    savePath.value = settings.savePath;
-    autoCommit.checked = settings.autoCommit;
-  }
-
-  applySettings();
-
-  p.onchange = () => { settings.ttsProvider = p.value; saveSettings(settings); };
-  rate.oninput = () => {
-    settings.speakingRate = parseFloat(rate.value);
-    rateVal.textContent = `${settings.speakingRate.toFixed(1)}×`;
-    saveSettings(settings);
-  };
-  audioResp.onchange = () => { settings.audioResponse = audioResp.checked; saveSettings(settings); };
-  model.onchange = () => { settings.model = model.value; saveSettings(settings); };
-  savePath.onchange = () => { settings.savePath = savePath.value; saveSettings(settings); };
-  autoCommit.onchange = () => { settings.autoCommit = autoCommit.checked; saveSettings(settings); };
+function stopAudio() {
+  if (audioEl) { audioEl.pause(); audioEl.src = ''; }
+  audioQueue = [];
 }
 
-// ── Event wiring ──────────────────────────────────────────────────────────────
+// ── Settings UI ───────────────────────────────────────────────────────────────
+function applySettingsToUI() {
+  document.getElementById('set-provider').value = settings.ttsProvider;
+  document.getElementById('set-rate').value = settings.speakingRate;
+  document.getElementById('rate-val').textContent = `${Number(settings.speakingRate).toFixed(1)}×`;
+  document.getElementById('set-audio-resp').checked = settings.audioResponse;
+  document.getElementById('set-save-path').value = settings.savePath;
+  document.getElementById('set-auto-commit').checked = settings.autoCommit;
 
+  // Model picker
+  const isPreset = ['small','medium','large'].includes(settings.model);
+  document.querySelectorAll('.model-option').forEach(opt => {
+    const sel = opt.dataset.model === settings.model;
+    opt.querySelector('.model-check').classList.toggle('hidden', !sel);
+  });
+  document.getElementById('set-model-custom').value = isPreset ? '' : (settings.model || '');
+}
+
+document.getElementById('set-provider').onchange = e => { settings.ttsProvider = e.target.value; saveSettings(); };
+document.getElementById('set-rate').oninput = e => {
+  settings.speakingRate = parseFloat(e.target.value);
+  document.getElementById('rate-val').textContent = `${settings.speakingRate.toFixed(1)}×`;
+  saveSettings();
+};
+document.getElementById('set-audio-resp').onchange = e => { settings.audioResponse = e.target.checked; saveSettings(); };
+document.getElementById('set-save-path').onchange = e => { settings.savePath = e.target.value; saveSettings(); };
+document.getElementById('set-auto-commit').onchange = e => { settings.autoCommit = e.target.checked; saveSettings(); };
+
+document.getElementById('model-card').addEventListener('click', e => {
+  const opt = e.target.closest('.model-option');
+  if (!opt) return;
+  settings.model = opt.dataset.model;
+  document.getElementById('set-model-custom').value = '';
+  saveSettings();
+  applySettingsToUI();
+});
+
+document.getElementById('set-model-custom').addEventListener('input', e => {
+  if (e.target.value) {
+    settings.model = e.target.value;
+    document.querySelectorAll('.model-check').forEach(c => c.classList.add('hidden'));
+    saveSettings();
+  }
+});
+
+// ── Wire events ───────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // Sessions
-  document.getElementById('settings-open-btn').onclick = () => showView('settings');
-  document.getElementById('new-session-btn').onclick = openNewSessionModal;
-  document.getElementById('modal-close-btn').onclick = () =>
-    document.getElementById('new-session-modal').classList.add('hidden');
-  document.getElementById('new-session-modal').addEventListener('click', e => {
-    if (e.target.id === 'new-session-modal')
-      document.getElementById('new-session-modal').classList.add('hidden');
+  // Sessions screen
+  document.getElementById('new-btn').onclick = openProjectSheet;
+  document.getElementById('settings-btn').onclick = () => { applySettingsToUI(); showScreen('settings'); };
+  document.getElementById('sheet-close-btn').onclick = closeSheet;
+  document.getElementById('project-sheet').addEventListener('click', e => {
+    if (e.target.id === 'project-sheet') closeSheet();
   });
 
-  // Talk
-  document.getElementById('back-btn').onclick = () => {
-    stopAudio();
-    showView('sessions');
-    loadSessions();
-  };
-
+  // Talk screen
+  document.getElementById('back-btn').onclick = () => { stopAudio(); showScreen('sessions'); loadSessions(); };
   document.getElementById('reset-btn').onclick = async () => {
     if (!confirm('Reset context for this session?')) return;
     await api('POST', `/api/chats/${activeChatId}/reset`).catch(e => alert(e.message));
@@ -1001,7 +1219,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMessages();
   };
 
-  // Mic: hold on desktop, hold on mobile
   const micBtn = document.getElementById('mic-btn');
   micBtn.addEventListener('mousedown', e => { e.preventDefault(); micStart(); });
   micBtn.addEventListener('mouseup', micStop);
@@ -1010,48 +1227,31 @@ document.addEventListener('DOMContentLoaded', () => {
   micBtn.addEventListener('touchend', e => { e.preventDefault(); micStop(); }, { passive: false });
   micBtn.addEventListener('touchcancel', e => { e.preventDefault(); micStop(); }, { passive: false });
 
-  // Keyboard toggle
-  document.getElementById('keyboard-btn').onclick = () => {
+  document.getElementById('keyboard-side').onclick = () => {
     keyboardMode = !keyboardMode;
-    document.getElementById('keyboard-btn').classList.toggle('active', keyboardMode);
+    document.getElementById('keyboard-side').classList.toggle('text-mode', keyboardMode);
     document.getElementById('text-bar').classList.toggle('hidden', !keyboardMode);
     if (keyboardMode) document.getElementById('text-input').focus();
   };
 
-  // Speaker toggle
-  document.getElementById('speaker-btn').onclick = () => {
+  document.getElementById('speaker-side').onclick = () => {
     audioEnabled = !audioEnabled;
-    document.getElementById('speaker-btn').classList.toggle('active', audioEnabled);
+    document.getElementById('speaker-side').classList.toggle('muted', !audioEnabled);
     if (!audioEnabled) stopAudio();
   };
 
-  // Text send
-  document.getElementById('send-btn').onclick = () => {
-    sendText(document.getElementById('text-input').value);
-  };
-
+  document.getElementById('send-btn').onclick = () => sendText(document.getElementById('text-input').value);
   document.getElementById('text-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendText(e.target.value);
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(e.target.value); }
   });
 
-  // Settings
-  document.getElementById('settings-close-btn').onclick = () => showView('sessions');
-  bindSettings();
+  // Settings screen
+  document.getElementById('settings-done-btn').onclick = () => showScreen('sessions');
 
   // Init
+  applySettingsToUI();
   loadSessions();
 });
-
-function stopAudio() {
-  if (audioEl) {
-    audioEl.pause();
-    audioEl.src = '';
-  }
-  audioQueue = [];
-}
 </script>
 </body>
 </html>
