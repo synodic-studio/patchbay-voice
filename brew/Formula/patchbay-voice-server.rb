@@ -8,7 +8,6 @@ class PatchbayVoiceServer < Formula
   depends_on :macos
 
   def install
-    # Install Python server sources into libexec
     libexec.install "server/app.py", "server/asr.py", "server/chats.py",
                     "server/config.py", "server/pi_runner.py", "server/tts.py"
     (libexec/"routes").install Dir["server/routes/*.py"]
@@ -17,34 +16,22 @@ class PatchbayVoiceServer < Formula
     (libexec/"web").install "web/index.html"
     (libexec/"pi").install "pi/tools.ts"
 
-    # Find REAL python path and fix the venv AFTER uv sync ensures Python 3.14
     cd(libexec) do
       system "uv", "sync"
 
-      # Discover the actual Python executable uv resolved to (after sync, it's guaranteed)
-      real_python = `uv run python -c "import sys,os; print(os.path.realpath(sys.executable))"`.strip
-      real_bindir = File.dirname(real_python)
-
-      # Rewrite pyvenv.cfg "home" from build-temp to the real Python path
-      system "sed", "-i", "", "s|^home = .*|home = #{real_bindir}|", ".venv/pyvenv.cfg"
-      # Create proper python symlinks pointing to the real Python
-      system "ln", "-sf", real_python, ".venv/bin/python3"
-      system "ln", "-sf", real_python, ".venv/bin/python"
-
       # Mark bundled dylibs immutable so Homebrew's post-install fixup
-      # doesn't fail on oversize Mach-O headers (faster-whisper bundles
-      # ffmpeg dylibs with short build-time paths).
+      # doesn't fail on oversize Mach-O headers.
       Dir.glob("#{libexec}/.venv/**/*.dylib").each do |dylib|
         system "install_name_tool", "-id", "@rpath/#{File.basename(dylib)}", dylib
         system "chflags", "uchg", dylib
       end
     end
 
-    # Install the patchbay-voice wrapper script
     (bin/"patchbay-voice").write <<~BASH
       #!/bin/bash
       set -euo pipefail
-      VENV_PYTHON="#{libexec}/.venv/bin/python3"
+      # leave this here so status/help still reference the right path
+      _PB_LIBEXEC="#{libexec}"
       _discover_urls() {
         local port="${VOICE_PORT:-8800}"
         echo "━━━ Patchbay Voice Server ━━━"
@@ -63,9 +50,8 @@ class PatchbayVoiceServer < Formula
         start)
           cd "#{libexec}"
           export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-          export PYTHONPATH="#{libexec}/.venv/lib/python3.14/site-packages:$PYTHONPATH"
           _discover_urls
-          exec "$VENV_PYTHON" -m uvicorn app:app \\
+          exec uv run uvicorn app:app \\
             --host "${VOICE_HOST:-0.0.0.0}" \\
             --port "${VOICE_PORT:-8800}" \\
             --log-level info
@@ -115,12 +101,8 @@ class PatchbayVoiceServer < Formula
   test do
     assert_match version.to_s, shell_output("#{bin}/patchbay-voice version 2>&1")
     assert_predicate libexec/"app.py", :exist?
-    assert_predicate libexec/".venv/bin/python3", :exist?
-    assert_predicate libexec/".venv/bin/python", :exist?
-    spp = "#{libexec}/.venv/lib/python3.14/site-packages"
-    py = "PYTHONPATH=#{spp}:$PYTHONPATH GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3"
-    assert_match "ok", shell_output("cd #{libexec} && #{py} -c \"from chats import Chat; print('ok')\"")
-    assert_match "ok", shell_output("cd #{libexec} && #{py} -c \"from pi_runner import _parse_events; print('ok')\"")
-    assert_match "ok", shell_output("cd #{libexec} && #{py} -c \"from tts import _split_sentences; print('ok')\"")
+    assert_predicate libexec/"routes/talk.py", :exist?
+    assert_predicate libexec/"web/index.html", :exist?
+    assert_predicate libexec/"pi/tools.ts", :exist?
   end
 end

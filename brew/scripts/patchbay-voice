@@ -1,30 +1,19 @@
 #!/bin/bash
 # patchbay-voice — Run the Patchbay Voice server
 # Installed by Homebrew: brew install synodic/patchbay-voice/patchbay-voice-server
-# Reference copy from brew/Formula/patchbay-voice-server.rb
 
 set -euo pipefail
-
-PB_LIBEXEC="${PB_LIBEXEC:-"$(cd "$(dirname "$0")/../libexec" && pwd)"}"
-VENV_PYTHON="${PB_LIBEXEC}/bin/python"
 
 _discover_urls() {
     local port="${VOICE_PORT:-8800}"
     echo "━━━ Patchbay Voice Server ━━━"
     echo ""
     echo "Connect your iOS app to one of these URLs:"
-    if command -v ipconfig &>/dev/null; then
-        ipconfig getifaddr en0 2>/dev/null | while read ip; do
-            [[ -n "$ip" ]] && echo "  http://$ip:$port   (Wi-Fi)"
-        done
-        ipconfig getifaddr en1 2>/dev/null | while read ip; do
-            [[ -n "$ip" ]] && echo "  http://$ip:$port   (Ethernet)"
-        done
-    fi
-    if command -v tailscale &>/dev/null; then
-        local ts=$(tailscale ip -4 2>/dev/null || true)
-        [[ -n "$ts" ]] && echo "  http://$ts:$port     (Tailscale)"
-    fi
+    command -v ipconfig &>/dev/null && {
+        ipconfig getifaddr en0 2>/dev/null | while read ip; do [[ -n "$ip" ]] && echo "  http://$ip:$port   (Wi-Fi)"; done
+        ipconfig getifaddr en1 2>/dev/null | while read ip; do [[ -n "$ip" ]] && echo "  http://$ip:$port   (Ethernet)"; done
+    }
+    command -v tailscale &>/dev/null && { local ts=$(tailscale ip -4 2>/dev/null || true); [[ -n "$ts" ]] && echo "  http://$ts:$port     (Tailscale)"; }
     echo ""
     echo "Set a custom host with: VOICE_HOST=<ip> brew services restart patchbay-voice-server"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -32,37 +21,26 @@ _discover_urls() {
 
 case "${1:-start}" in
     start)
-        cd "$PB_LIBEXEC"
+        cd "$(dirname "$0")/../libexec"
         export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         _discover_urls
-        exec "$VENV_PYTHON" -m uvicorn app:app \
+        exec uv run uvicorn app:app \
             --host "${VOICE_HOST:-0.0.0.0}" \
             --port "${VOICE_PORT:-8800}" \
             --log-level info
         ;;
     status)
         if brew services list 2>/dev/null | grep -q "patchbay-voice-server.*started"; then
-            echo "Running (brew services)"
-            _discover_urls
+            echo "Running (brew services)"; _discover_urls
         elif launchctl list | grep -q "com.synodic.patchbay-voice-server"; then
-            echo "Running"
-            _discover_urls
-        else
-            echo "Not running"
-        fi
+            echo "Running"; _discover_urls
+        else echo "Not running"; fi
         ;;
-    logs)
-        exec tail -f "${HOME}/Library/Logs/patchbay-voice-server.log"
-        ;;
-    urls)
-        _discover_urls
-        ;;
-    version)
-        echo "Patchbay Voice Server ${PB_VERSION:-development}"
-        ;;
+    logs) exec tail -f "${HOME}/Library/Logs/patchbay-voice-server.log" ;;
+    urls) _discover_urls ;;
+    version) echo "Patchbay Voice Server ${PB_VERSION:-development}" ;;
     help|--help|-h|*)
         echo "Usage: patchbay-voice <start|status|logs|urls|version>"
-        echo ""
         echo "  start    Start the server (foreground)"
         echo "  status   Show server status and connection URLs"
         echo "  logs     Tail the server log"
