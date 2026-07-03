@@ -101,21 +101,30 @@ class TestFindSessionId:
         assert _find_session_id([{"type": "session", "id": 123}]) is None
 
 
-def _msg_update(kind: str, content: str, idx: int = 0) -> dict:
-    """Build a message_update event as pi emits."""
-    ame: dict = {"type": kind, "contentIndex": idx}
-    if kind == "text_delta":
-        ame["delta"] = content
-    elif kind == "text_end":
-        ame["content"] = content
-    return {"type": "message_update", "assistantMessageEvent": ame}
+def _agent_end(messages: list[dict], *, will_retry: bool = False) -> dict:
+    ev: dict = {"type": "agent_end", "messages": messages}
+    if will_retry:
+        ev["willRetry"] = True
+    return ev
+
+
+def _assistant_msg(*blocks: dict) -> dict:
+    return {"role": "assistant", "content": list(blocks)}
+
+
+def _text_block(text: str) -> dict:
+    return {"type": "text", "text": text}
+
+
+def _thinking_block(thinking: str) -> dict:
+    return {"type": "thinking", "thinking": thinking, "thinkingSignature": "sig"}
 
 
 class TestExtractText:
-    def test_extracts_text_end(self):
+    def test_extracts_text_from_agent_end(self):
         from pi_runner import _extract_text
 
-        events = [_msg_update("text_end", "Hello there.")]
+        events = [_agent_end([_assistant_msg(_text_block("Hello there."))])]
         assert _extract_text(events) == "Hello there."
 
     def test_empty_events(self):
@@ -123,41 +132,64 @@ class TestExtractText:
 
         assert _extract_text([]) == ""
 
-    def test_accumulates_deltas_when_no_text_end(self):
+    def test_excludes_thinking_blocks(self):
         from pi_runner import _extract_text
 
         events = [
-            _msg_update("text_delta", "Hello "),
-            _msg_update("text_delta", "there."),
+            _agent_end(
+                [
+                    _assistant_msg(
+                        _thinking_block("step 1: think hard"),
+                        _text_block("The answer is 42."),
+                    )
+                ]
+            )
         ]
-        assert _extract_text(events) == "Hello there."
+        assert _extract_text(events) == "The answer is 42."
 
-    def test_prefers_text_end_over_deltas(self):
+    def test_ignores_will_retry_agent_end(self):
         from pi_runner import _extract_text
 
         events = [
-            _msg_update("text_delta", "partial"),
-            _msg_update("text_end", "Hello there."),
+            _agent_end([_assistant_msg(_text_block("attempt 1"))], will_retry=True),
+            _agent_end([_assistant_msg(_text_block("final answer"))]),
         ]
-        assert _extract_text(events) == "Hello there."
+        assert _extract_text(events) == "final answer"
 
-    def test_multiple_content_blocks(self):
+    def test_multiple_text_blocks_joined(self):
         from pi_runner import _extract_text
 
         events = [
-            _msg_update("text_end", "first", idx=0),
-            _msg_update("text_end", "second", idx=1),
+            _agent_end(
+                [
+                    _assistant_msg(
+                        _thinking_block("reasoning..."),
+                        _text_block("Part one."),
+                        _text_block("Part two."),
+                    )
+                ]
+            )
         ]
-        assert _extract_text(events) == "first\nsecond"
+        assert _extract_text(events) == "Part one.\nPart two."
 
-    def test_ignores_non_message_update_events(self):
+    def test_skips_user_messages(self):
         from pi_runner import _extract_text
 
         events = [
-            {"type": "agent_end", "messages": [{"role": "assistant", "content": [{"text": "ignored"}]}]},
-            _msg_update("text_end", "kept"),
+            _agent_end(
+                [
+                    {"role": "user", "content": [_text_block("user prompt")]},
+                    _assistant_msg(_text_block("reply")),
+                ]
+            )
         ]
-        assert _extract_text(events) == "kept"
+        assert _extract_text(events) == "reply"
+
+    def test_no_agent_end_returns_empty(self):
+        from pi_runner import _extract_text
+
+        events = [{"type": "agent_start"}, {"type": "turn_start"}]
+        assert _extract_text(events) == ""
 
 
 class TestFindError:

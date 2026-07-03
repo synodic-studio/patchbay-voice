@@ -34,32 +34,23 @@ def _find_session_id(events: list[dict]) -> str | None:
 
 
 def _extract_text(events: list[dict]) -> str:
-    # Track text_end/text_delta from message_update events — same approach as
-    # patchbay-relay's pi harness. Avoids pulling from agent_end.messages which
-    # mixes thinking blocks with reply text and requires reverse-searching for a
-    # terminator event.
-    texts: list[str] = []
-    pending: dict[int, list[str]] = {}
-    for ev in events:
-        if ev.get("type") != "message_update":
+    for ev in reversed(events):
+        if ev.get("type") != "agent_end" or ev.get("willRetry"):
             continue
-        ame = ev.get("assistantMessageEvent") or {}
-        kind = ame.get("type")
-        idx = ame.get("contentIndex", 0)
-        if kind == "text_delta":
-            delta = ame.get("delta", "")
-            if isinstance(delta, str) and delta:
-                pending.setdefault(idx, []).append(delta)
-        elif kind == "text_end":
-            content = ame.get("content")
-            if isinstance(content, str) and content:
-                texts.append(content)
-                pending.pop(idx, None)
-            elif idx in pending:
-                texts.append("".join(pending.pop(idx)))
-    for chunk in pending.values():
-        texts.append("".join(chunk))
-    return "\n".join(t for t in texts if t).strip()
+        parts: list[str] = []
+        for msg in ev.get("messages", []):
+            if msg.get("role") != "assistant":
+                continue
+            content = msg.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        text = block.get("text", "")
+                        if text:
+                            parts.append(text)
+        if parts:
+            return "\n".join(parts).strip()
+    return ""
 
 
 def _find_error(events: list[dict]) -> str | None:
