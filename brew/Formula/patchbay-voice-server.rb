@@ -62,6 +62,7 @@ class PatchbayVoiceServer < Formula
         start)
           cd "#{libexec}"
           export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          export PYTHONPATH="#{libexec}/.venv/lib/python3.14/site-packages:$PYTHONPATH"
           _discover_urls
           exec "$VENV_PYTHON" -m uvicorn app:app \\
             --host "${VOICE_HOST:-0.0.0.0}" \\
@@ -115,8 +116,10 @@ class PatchbayVoiceServer < Formula
     assert_predicate libexec/"app.py", :exist?
     assert_predicate libexec/".venv/bin/python3", :exist?
     assert_predicate libexec/".venv/bin/python", :exist?
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c \"from chats import Chat; print('ok')\"")
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c \"from pi_runner import _parse_events; print('ok')\"")
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c \"from tts import _split_sentences; print('ok')\"")
+    spp = "#{libexec}/.venv/lib/python3.14/site-packages"
+    py = "PYTHONPATH=#{spp}:$PYTHONPATH GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3"
+    assert_match "ok", shell_output("cd #{libexec} && #{py} -c \"from chats import Chat; print('ok')\"")
+    assert_match "ok", shell_output("cd #{libexec} && #{py} -c \"from pi_runner import _parse_events; print('ok')\"")
+    assert_match "ok", shell_output("cd #{libexec} && #{py} -c \"from tts import _split_sentences; print('ok')\"")
   end
 end
