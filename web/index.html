@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Patchbay Voice</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f0f0f;
+  --surface: #1a1a1a;
+  --surface-2: #242424;
+  --surface-3: #2e2e2e;
+  --border: #2e2e2e;
+  --accent: #3b82f6;
+  --user-bubble: #1c3356;
+  --text: #e2e8f0;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --red: #ef4444;
+  --green: #22c55e;
+  --radius: 10px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.view {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.hidden { display: none !important; }
+
+/* ── Header ──────────────────────────────────────────── */
+.hdr {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 52px;
+}
+
+.hdr-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+button {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 19px;
+  flex-shrink: 0;
+}
+
+.btn-icon:hover { background: var(--surface-2); }
+
+.btn-text {
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 6px 10px;
+}
+
+.btn-text:hover { background: var(--surface-2); }
+.btn-danger { color: var(--red) !important; }
+
+/* ── Sessions ────────────────────────────────────────── */
+#sessions-main {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  gap: 12px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.session-item:hover { background: var(--surface); }
+.session-item:active { background: var(--surface-2); }
+
+.session-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  flex-shrink: 0;
+}
+
+.session-dot.active { background: var(--green); }
+
+.session-info { flex: 1; min-width: 0; }
+
+.session-name {
+  font-size: 15px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Mono', 'Menlo', monospace;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-btn {
+  font-size: 16px;
+  color: var(--text-muted);
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.session-btn:hover { background: var(--surface-2); color: var(--text); }
+
+/* ── Empty state ─────────────────────────────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 80px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-icon { font-size: 40px; opacity: 0.35; }
+.empty p { font-size: 15px; }
+
+/* ── Messages ────────────────────────────────────────── */
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+  gap: 3px;
+}
+
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.assistant { align-self: flex-start; align-items: flex-start; }
+
+.bubble {
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.msg.user .bubble {
+  background: var(--user-bubble);
+  border-bottom-right-radius: 4px;
+}
+
+.msg.assistant .bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+  color: var(--text);
+}
+
+.msg-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+.status-pill {
+  align-self: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 5px 14px;
+  background: var(--surface-2);
+  border-radius: 20px;
+}
+
+/* ── Talk footer ─────────────────────────────────────── */
+.talk-footer {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+#talk-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 28px 12px;
+  gap: 8px;
+}
+
+#mic-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 3px 14px rgba(59, 130, 246, 0.4);
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+  touch-action: none;
+}
+
+#mic-btn:hover { background: #2563eb; }
+
+#mic-btn.recording {
+  background: var(--red);
+  box-shadow: 0 3px 20px rgba(239, 68, 68, 0.55);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+#mic-btn.thinking {
+  background: var(--surface-3);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+#mic-btn.thinking .mic-icon { opacity: 0.4; }
+
+@keyframes mic-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
+.ctrl-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 20px;
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+
+.ctrl-btn:hover { background: var(--surface-2); color: var(--text); }
+.ctrl-btn.active { color: var(--accent); }
+
+/* ── Text input bar ──────────────────────────────────── */
+#text-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 10px;
+}
+
+#text-input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 10px 16px;
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+}
+
+#text-input:focus { border-color: var(--accent); }
+#text-input::placeholder { color: var(--text-muted); }
+
+/* ── Settings panel ──────────────────────────────────── */
+#settings-view {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  max-width: 640px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-scroll { overflow-y: auto; flex: 1; padding-bottom: 40px; }
+
+.settings-section {
+  padding: 0 16px;
+  margin-top: 24px;
+}
+
+.settings-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.settings-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.s-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+  min-height: 48px;
+}
+
+.s-row:last-child { border-bottom: none; }
+
+.s-row label {
+  font-size: 15px;
+  flex: 1;
+}
+
+.s-row input[type="text"] {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  text-align: right;
+  outline: none;
+  min-width: 0;
+  width: 160px;
+  font-family: inherit;
+}
+
+.s-row input[type="text"]:focus { color: var(--text); }
+
+.s-row select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.s-row input[type="range"] {
+  width: 110px;
+  accent-color: var(--accent);
+}
+
+.s-rate-val {
+  font-size: 13px;
+  color: var(--text-dim);
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Toggle */
+.toggle { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track {
+  display: block;
+  width: 100%; height: 100%;
+  border-radius: 13px;
+  background: var(--surface-3);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle input:checked + .toggle-track { background: var(--accent); }
+.toggle-thumb {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.toggle input:checked ~ .toggle-thumb { left: 21px; }
+
+/* ── Modal ───────────────────────────────────────────── */
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,.65);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal-sheet {
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-width: 640px;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-hdr {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-hdr h2 { flex: 1; font-size: 15px; font-weight: 600; }
+
+.modal-list { overflow-y: auto; flex: 1; }
+
+.modal-item {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 15px;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modal-item:hover { background: var(--surface-2); }
+.modal-item:last-child { border-bottom: none; }
+
+/* ── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ SESSIONS VIEW ════════════════════ -->
+<div id="sessions-view" class="view">
+  <div class="hdr">
+    <span class="hdr-title">Patchbay Voice</span>
+    <button class="btn-icon" id="settings-open-btn" title="Settings" aria-label="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+    <button class="btn-text" id="new-session-btn">New</button>
+  </div>
+  <div id="sessions-main" class="view-main"></div>
+</div>
+
+<!-- ═══════════════════ TALK VIEW ═════════════════════════ -->
+<div id="talk-view" class="view hidden">
+  <div class="hdr">
+    <button class="btn-icon" id="back-btn" aria-label="Back">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <span class="hdr-title" id="talk-title"></span>
+    <button class="btn-text btn-danger" id="reset-btn">Reset</button>
+  </div>
+  <div id="messages"></div>
+  <div class="talk-footer">
+    <div id="talk-controls">
+      <button class="ctrl-btn" id="keyboard-btn" title="Toggle keyboard" aria-label="Toggle keyboard">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>
+        </svg>
+      </button>
+      <button id="mic-btn" aria-label="Hold to talk">
+        <span class="mic-icon">🎤</span>
+      </button>
+      <button class="ctrl-btn active" id="speaker-btn" title="Toggle audio" aria-label="Toggle audio">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" id="speaker-icon">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      </button>
+    </div>
+    <div id="text-bar" class="hidden">
+      <input id="text-input" type="text" placeholder="Type a message…" autocomplete="off" enterkeyhint="send">
+      <button class="btn-text" id="send-btn">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SETTINGS VIEW ════════════════════ -->
+<div id="settings-view" class="hidden">
+  <div class="hdr">
+    <span class="hdr-title">Settings</span>
+    <button class="btn-text" id="settings-close-btn">Done</button>
+  </div>
+  <div class="settings-scroll">
+    <div class="settings-section">
+      <div class="settings-label">Voice</div>
+      <div class="settings-card">
+        <div class="s-row">
+          <label for="set-provider">TTS provider</label>
+          <select id="set-provider">
+            <option value="say">macOS say</option>
+            <option value="google">Google Cloud</option>
+          </select>
+        </div>
+        <div class="s-row">
+          <label>Speaking rate</label>
+          <input type="range" id="set-rate" min="0.5" max="2.0" step="0.1">
+          <span class="s-rate-val" id="rate-val">1.0×</span>
+        </div>
+        <div class="s-row">
+          <label for="set-audio-resp">Spoken replies</label>
+          <label class="toggle">
+            <input type="checkbox" id="set-audio-resp" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-thumb"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-label">Agent</div>
+      <div class="settings-card">
+        <div class="s-row">
+          <label for="set-model">Model</label>
+          <input type="text" id="set-model" placeholder="small">
+        </div>
+        <div class="s-row">
+          <label for="set-save-path">Save path</label>
+          <input type="text" id="set-save-path" placeholder="docs/patchbay/">
+        </div>
+        <div class="s-row">
+          <label for="set-auto-commit">Auto commit</label>
+          <label class="toggle">
+            <input type="checkbox" id="set-auto-commit">
+            <span class="toggle-track"></span>
+            <span class="toggle-thumb"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ NEW SESSION MODAL ════════════════ -->
+<div id="new-session-modal" class="modal-bg hidden">
+  <div class="modal-sheet">
+    <div class="modal-hdr">
+      <h2>Select Project</h2>
+      <button class="btn-icon" id="modal-close-btn">✕</button>
+    </div>
+    <div id="projects-list" class="modal-list"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+const DEFAULTS = {
+  ttsProvider: 'say',
+  speakingRate: 1.0,
+  audioResponse: true,
+  savePath: 'docs/patchbay/',
+  model: '',
+  autoCommit: false,
+};
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('pvSettings') || '{}');
+    return { ...DEFAULTS, ...s };
+  } catch { return { ...DEFAULTS }; }
+}
+
+function saveSettings(s) {
+  localStorage.setItem('pvSettings', JSON.stringify(s));
+}
+
+let settings = loadSettings();
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+let activeChatId = null;
+let activeProjectDir = null;
+let localMessages = {}; // chatId → [{role, text}]
+let keyboardMode = false;
+let audioEnabled = true;
+let micRecorder = null;
+let micChunks = [];
+let audioQueue = [];
+let audioEl = null;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function reltime(ts) {
+  if (!ts) return '';
+  const diff = Date.now() / 1000 - ts;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body instanceof FormData) {
+    opts.body = body;
+  } else if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(path, opts);
+  if (!r.ok) {
+    const msg = (await r.json().catch(() => ({detail: r.statusText}))).detail || r.statusText;
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+function scrollMessages() {
+  const el = document.getElementById('messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── View switching ────────────────────────────────────────────────────────────
+
+function showView(name) {
+  ['sessions-view', 'talk-view', 'settings-view'].forEach(id => {
+    document.getElementById(id).classList.toggle('hidden', id !== name + '-view');
+  });
+}
+
+// ── Sessions view ─────────────────────────────────────────────────────────────
+
+async function loadSessions() {
+  const container = document.getElementById('sessions-main');
+  try {
+    const data = await api('GET', '/api/chats');
+    renderSessions(data.chats || []);
+  } catch (e) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+function renderSessions(chats) {
+  const container = document.getElementById('sessions-main');
+  if (!chats.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">🎤</div><p>No sessions yet.<br>Tap <strong>New</strong> to create one.</p></div>`;
+    return;
+  }
+  container.innerHTML = chats.map(c => `
+    <div class="session-item" data-id="${c.id}" data-dir="${c.project_dir}">
+      <div class="session-dot ${c.pi_session_id ? 'active' : ''}"></div>
+      <div class="session-info">
+        <div class="session-name">${c.project_dir}</div>
+        <div class="session-meta">${reltime(c.last_active)}</div>
+      </div>
+      <button class="session-btn" data-action="reset" data-id="${c.id}" title="Reset context">↺</button>
+      <button class="session-btn" data-action="delete" data-id="${c.id}" title="Delete session">✕</button>
+    </div>`).join('');
+
+  container.querySelectorAll('.session-item').forEach(el => {
+    el.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (btn) {
+        e.stopPropagation();
+        const { action, id } = btn.dataset;
+        if (action === 'delete') deleteSession(id);
+        else if (action === 'reset') resetSession(id);
+        return;
+      }
+      openChat(el.dataset.id, el.dataset.dir);
+    });
+  });
+}
+
+async function deleteSession(id) {
+  if (!confirm('Delete this session?')) return;
+  await api('DELETE', `/api/chats/${id}`).catch(e => alert(e.message));
+  delete localMessages[id];
+  loadSessions();
+}
+
+async function resetSession(id) {
+  await api('POST', `/api/chats/${id}/reset`).catch(e => alert(e.message));
+  localMessages[id] = [];
+  loadSessions();
+}
+
+// ── New session modal ─────────────────────────────────────────────────────────
+
+async function openNewSessionModal() {
+  document.getElementById('new-session-modal').classList.remove('hidden');
+  const list = document.getElementById('projects-list');
+  list.innerHTML = '<div class="modal-item" style="color:var(--text-muted)">Loading…</div>';
+  try {
+    const data = await api('GET', '/api/projects');
+    list.innerHTML = (data.projects || []).map(p =>
+      `<div class="modal-item" data-dir="${p}">${p}</div>`
+    ).join('');
+    list.querySelectorAll('[data-dir]').forEach(el => {
+      el.addEventListener('click', () => createSession(el.dataset.dir));
+    });
+  } catch (e) {
+    list.innerHTML = `<div class="modal-item" style="color:var(--red)">${e.message}</div>`;
+  }
+}
+
+async function createSession(dir) {
+  document.getElementById('new-session-modal').classList.add('hidden');
+  try {
+    const chat = await api('POST', '/api/chats', { project_dir: dir });
+    openChat(chat.id, chat.project_dir);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+// ── Talk view ─────────────────────────────────────────────────────────────────
+
+function openChat(chatId, projectDir) {
+  activeChatId = chatId;
+  activeProjectDir = projectDir;
+  document.getElementById('talk-title').textContent = projectDir;
+  if (!localMessages[chatId]) localMessages[chatId] = [];
+  renderMessages();
+  showView('talk');
+  requestAnimationFrame(scrollMessages);
+}
+
+function renderMessages() {
+  const el = document.getElementById('messages');
+  const msgs = localMessages[activeChatId] || [];
+  if (!msgs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🎤</div><p>Hold the mic to talk.</p></div>';
+    return;
+  }
+  el.innerHTML = msgs.map(m => `
+    <div class="msg ${m.role}">
+      <div class="bubble">${escapeHtml(m.text)}</div>
+    </div>`).join('');
+  requestAnimationFrame(scrollMessages);
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function addMessage(role, text) {
+  if (!localMessages[activeChatId]) localMessages[activeChatId] = [];
+  localMessages[activeChatId].push({ role, text });
+  renderMessages();
+}
+
+function setStatusPill(text) {
+  const el = document.getElementById('messages');
+  const existing = el.querySelector('.status-pill');
+  if (existing) existing.remove();
+  if (text) {
+    const pill = document.createElement('div');
+    pill.className = 'status-pill';
+    pill.textContent = text;
+    el.appendChild(pill);
+    requestAnimationFrame(scrollMessages);
+  }
+}
+
+// ── Mic recording ─────────────────────────────────────────────────────────────
+
+function micStart() {
+  const btn = document.getElementById('mic-btn');
+  if (btn.classList.contains('thinking') || btn.classList.contains('recording')) return;
+
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', '']
+      .find(t => !t || MediaRecorder.isTypeSupported(t)) || '';
+    micChunks = [];
+    micRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+    micRecorder.ondataavailable = e => e.data.size && micChunks.push(e.data);
+    micRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const ext = micRecorder.mimeType.includes('webm') ? 'webm' : 'ogg';
+      const blob = new Blob(micChunks, { type: micRecorder.mimeType });
+      sendAudio(blob, ext);
+    };
+    micRecorder.start();
+    btn.classList.add('recording');
+    setStatusPill('Recording…');
+  }).catch(e => {
+    alert(`Microphone error: ${e.message}`);
+  });
+}
+
+function micStop() {
+  const btn = document.getElementById('mic-btn');
+  if (!micRecorder || micRecorder.state !== 'recording') return;
+  micRecorder.stop();
+  btn.classList.remove('recording');
+  setStatusPill(null);
+}
+
+async function sendAudio(blob, ext) {
+  const btn = document.getElementById('mic-btn');
+  btn.classList.add('thinking');
+  setStatusPill('Thinking…');
+
+  try {
+    const fd = buildFormData();
+    fd.append('audio', blob, `audio.${ext}`);
+    const data = await api('POST', '/api/talk', fd);
+    onTurnResult(data);
+  } catch (e) {
+    setStatusPill(null);
+    addMessage('assistant', `Error: ${e.message}`);
+  } finally {
+    btn.classList.remove('thinking');
+  }
+}
+
+async function sendText(text) {
+  if (!text.trim()) return;
+  const input = document.getElementById('text-input');
+  input.value = '';
+  addMessage('user', text);
+
+  const btn = document.getElementById('mic-btn');
+  btn.classList.add('thinking');
+  setStatusPill('Thinking…');
+
+  try {
+    const fd = buildFormData();
+    fd.append('text', text);
+    const data = await api('POST', '/api/talk', fd);
+    onTurnResult(data);
+  } catch (e) {
+    setStatusPill(null);
+    addMessage('assistant', `Error: ${e.message}`);
+  } finally {
+    btn.classList.remove('thinking');
+  }
+}
+
+function buildFormData() {
+  const fd = new FormData();
+  fd.append('chat_id', activeChatId);
+  fd.append('audio_response', audioEnabled ? 'true' : 'false');
+  fd.append('chunked_audio', 'true');
+  fd.append('tts_provider', settings.ttsProvider);
+  fd.append('speaking_rate', String(settings.speakingRate));
+  fd.append('save_path', settings.savePath || 'docs/patchbay/');
+  fd.append('auto_commit', settings.autoCommit ? 'true' : 'false');
+  if (settings.model) fd.append('model', settings.model);
+  return fd;
+}
+
+function onTurnResult(data) {
+  setStatusPill(null);
+  if (data.transcript) addMessage('user', data.transcript);
+  if (data.reply) addMessage('assistant', data.reply);
+  if (audioEnabled && data.audio_urls && data.audio_urls.length) {
+    playAudioQueue(data.audio_urls);
+  }
+}
+
+// ── Audio playback ────────────────────────────────────────────────────────────
+
+function playAudioQueue(urls) {
+  if (!audioEl) {
+    audioEl = new Audio();
+    audioEl.onended = () => {
+      audioQueue.shift();
+      if (audioQueue.length) {
+        audioEl.src = audioQueue[0];
+        audioEl.play().catch(() => {});
+      }
+    };
+  }
+  audioQueue.push(...urls);
+  if (audioQueue.length === urls.length) {
+    audioEl.src = audioQueue[0];
+    audioEl.play().catch(() => {});
+  }
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+function bindSettings() {
+  const p = document.getElementById('set-provider');
+  const rate = document.getElementById('set-rate');
+  const rateVal = document.getElementById('rate-val');
+  const audioResp = document.getElementById('set-audio-resp');
+  const model = document.getElementById('set-model');
+  const savePath = document.getElementById('set-save-path');
+  const autoCommit = document.getElementById('set-auto-commit');
+
+  function applySettings() {
+    p.value = settings.ttsProvider;
+    rate.value = settings.speakingRate;
+    rateVal.textContent = `${settings.speakingRate.toFixed(1)}×`;
+    audioResp.checked = settings.audioResponse;
+    model.value = settings.model;
+    savePath.value = settings.savePath;
+    autoCommit.checked = settings.autoCommit;
+  }
+
+  applySettings();
+
+  p.onchange = () => { settings.ttsProvider = p.value; saveSettings(settings); };
+  rate.oninput = () => {
+    settings.speakingRate = parseFloat(rate.value);
+    rateVal.textContent = `${settings.speakingRate.toFixed(1)}×`;
+    saveSettings(settings);
+  };
+  audioResp.onchange = () => { settings.audioResponse = audioResp.checked; saveSettings(settings); };
+  model.onchange = () => { settings.model = model.value; saveSettings(settings); };
+  savePath.onchange = () => { settings.savePath = savePath.value; saveSettings(settings); };
+  autoCommit.onchange = () => { settings.autoCommit = autoCommit.checked; saveSettings(settings); };
+}
+
+// ── Event wiring ──────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Sessions
+  document.getElementById('settings-open-btn').onclick = () => showView('settings');
+  document.getElementById('new-session-btn').onclick = openNewSessionModal;
+  document.getElementById('modal-close-btn').onclick = () =>
+    document.getElementById('new-session-modal').classList.add('hidden');
+  document.getElementById('new-session-modal').addEventListener('click', e => {
+    if (e.target.id === 'new-session-modal')
+      document.getElementById('new-session-modal').classList.add('hidden');
+  });
+
+  // Talk
+  document.getElementById('back-btn').onclick = () => {
+    stopAudio();
+    showView('sessions');
+    loadSessions();
+  };
+
+  document.getElementById('reset-btn').onclick = async () => {
+    if (!confirm('Reset context for this session?')) return;
+    await api('POST', `/api/chats/${activeChatId}/reset`).catch(e => alert(e.message));
+    localMessages[activeChatId] = [];
+    renderMessages();
+  };
+
+  // Mic: hold on desktop, hold on mobile
+  const micBtn = document.getElementById('mic-btn');
+  micBtn.addEventListener('mousedown', e => { e.preventDefault(); micStart(); });
+  micBtn.addEventListener('mouseup', micStop);
+  micBtn.addEventListener('mouseleave', micStop);
+  micBtn.addEventListener('touchstart', e => { e.preventDefault(); micStart(); }, { passive: false });
+  micBtn.addEventListener('touchend', e => { e.preventDefault(); micStop(); }, { passive: false });
+  micBtn.addEventListener('touchcancel', e => { e.preventDefault(); micStop(); }, { passive: false });
+
+  // Keyboard toggle
+  document.getElementById('keyboard-btn').onclick = () => {
+    keyboardMode = !keyboardMode;
+    document.getElementById('keyboard-btn').classList.toggle('active', keyboardMode);
+    document.getElementById('text-bar').classList.toggle('hidden', !keyboardMode);
+    if (keyboardMode) document.getElementById('text-input').focus();
+  };
+
+  // Speaker toggle
+  document.getElementById('speaker-btn').onclick = () => {
+    audioEnabled = !audioEnabled;
+    document.getElementById('speaker-btn').classList.toggle('active', audioEnabled);
+    if (!audioEnabled) stopAudio();
+  };
+
+  // Text send
+  document.getElementById('send-btn').onclick = () => {
+    sendText(document.getElementById('text-input').value);
+  };
+
+  document.getElementById('text-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendText(e.target.value);
+    }
+  });
+
+  // Settings
+  document.getElementById('settings-close-btn').onclick = () => showView('sessions');
+  bindSettings();
+
+  // Init
+  loadSessions();
+});
+
+function stopAudio() {
+  if (audioEl) {
+    audioEl.pause();
+    audioEl.src = '';
+  }
+  audioQueue = [];
+}
+</script>
+</body>
+</html>

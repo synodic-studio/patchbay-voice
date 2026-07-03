@@ -69,7 +69,7 @@ SYSTEM_PROMPT = (
 )
 
 HERE = Path(__file__).resolve().parent
-STATIC_DIR = HERE / "static"
+STATIC_DIR = HERE.parent / "web"
 EXTENSION_PATH = HERE.parent / "pi" / "tools.ts"
 
 AUDIO_DIR = Path(tempfile.gettempdir()) / "voice-demo-audio"
