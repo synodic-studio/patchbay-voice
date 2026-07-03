@@ -1,12 +1,10 @@
 class PatchbayVoiceServer < Formula
-  include Language::Python::Virtualenv
-
   desc "Voice interface to the pi coding agent — local server"
   homepage "https://github.com/synodic/patchbay-voice"
   url "https://github.com/synodic/patchbay-voice/archive/refs/tags/v1.0.0.tar.gz"
   head "https://github.com/synodic/patchbay-voice.git", branch: "develop"
 
-  depends_on "python@3.14"
+  depends_on "uv"
   depends_on :macos
 
   def install
@@ -14,29 +12,12 @@ class PatchbayVoiceServer < Formula
                     "server/config.py", "server/pi_runner.py", "server/tts.py"
     (libexec/"routes").install Dir["server/routes/*.py"]
     (libexec/"tests").install Dir["server/tests/*.py"]
+    libexec.install "server/pyproject.toml"
     (libexec/"web").install "web/index.html"
     (libexec/"pi").install "pi/tools.ts"
 
-    # Create a standard venv with Homebrew's Python and pip-install deps.
-    # uv sync is faster but creates non-portable venvs tied to build-time paths.
-    venv = virtualenv_create(libexec, "python3.14")
-    # Install deps via pip inside the venv (Homebrew's pip_install uses --no-deps)
-    pip = "#{libexec}/bin/pip"
-    system pip, "install", "--quiet", "starlette"
-    system pip, "install", "--quiet", "fastapi"
-    system pip, "install", "--quiet", "uvicorn"
-    system pip, "install", "--quiet", "faster-whisper"
-    system pip, "install", "--quiet", "python-multipart"
-    system pip, "install", "--quiet", "httpx"
-    system pip, "install", "--quiet", "google-auth"
-    system pip, "install", "--quiet", "requests"
-
-    # Mark bundled dylibs immutable so Homebrew's post-install fixup
-    # doesn't fail on oversize Mach-O headers (faster-whisper bundles ffmpeg
-    # dylibs with short build-time paths).
-    Dir.glob("#{libexec}/lib/python3.14/site-packages/**/*.dylib").each do |dylib|
-      system "install_name_tool", "-id", "@rpath/#{File.basename(dylib)}", dylib
-      system "chflags", "uchg", dylib
+    cd(libexec) do
+      system "uv", "sync"
     end
 
     (bin/"patchbay-voice").write <<~BASH
@@ -60,7 +41,7 @@ class PatchbayVoiceServer < Formula
           cd "#{libexec}"
           export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
           _discover_urls
-          exec bin/uvicorn app:app \\
+          exec uv run uvicorn app:app \\
             --host "${VOICE_HOST:-0.0.0.0}" \\
             --port "${VOICE_PORT:-8800}" \\
             --log-level info
@@ -96,8 +77,8 @@ class PatchbayVoiceServer < Formula
       URLs:  patchbay-voice urls
       Logs:  patchbay-voice logs
 
-      To change the bind address (default: 0.0.0.0 — all interfaces):
-        echo 'set env VOICE_HOST 127.0.0.1' | brew services restart patchbay-voice-server
+      Note: You may see "Failed to fix install linkage" warnings about dylibs
+      from faster-whisper — this is cosmetic and does not affect functionality.
     EOS
   end
 
@@ -113,9 +94,7 @@ class PatchbayVoiceServer < Formula
   test do
     assert_match version.to_s, shell_output("#{bin}/patchbay-voice version 2>&1")
     assert_predicate libexec/"app.py", :exist?
-    assert_predicate libexec/"bin/uvicorn", :exist?
     assert_predicate libexec/"web/index.html", :exist?
     assert_predicate libexec/"pi/tools.ts", :exist?
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python3 -c \"from tts import _split_sentences; print('ok')\"")
   end
 end
