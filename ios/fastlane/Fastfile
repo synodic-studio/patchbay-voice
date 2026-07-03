@@ -65,7 +65,7 @@ platform :ios do
     )
 
     asc_script = File.expand_path(
-      "~/.claude/plugins/cache/synodic-kit/synodic-kit/df53c3e5f437/skills/testflight-ship/scripts/asc.py",
+      "~/Developer/synodic-kit/plugins/apple/skills/testflight-ship/scripts/asc.py",
     )
     app_id = "6785742336"
     # Internal Testers group has hasAccessToAllBuilds=False — must be explicitly linked
@@ -78,7 +78,7 @@ platform :ios do
   desc "Increment CURRENT_PROJECT_VERSION in Project.swift, anchored to latest TestFlight build"
   lane :bump_build do
     asc_script = File.expand_path(
-      "~/.claude/plugins/cache/synodic-kit/synodic-kit/df53c3e5f437/skills/testflight-ship/scripts/asc.py",
+      "~/Developer/synodic-kit/plugins/apple/skills/testflight-ship/scripts/asc.py",
     )
     app_id = "6785742336"
     tf_latest_str = sh(
