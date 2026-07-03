@@ -25,6 +25,7 @@ async def talk(
     text: str | None = Form(default=None),
     audio_response: str = Form(default="true"),
     tts_provider: str = Form(default="say"),
+    speaking_rate: float = Form(default=1.0),
     chunked_audio: str = Form(default="false"),
     save_path: str = Form(default="docs/patchbay/"),
     auto_commit: str = Form(default="false"),
@@ -87,9 +88,9 @@ async def talk(
     if want_audio and reply:
         try:
             if want_chunked:
-                paths = await tts_mod.synthesize_chunked(reply, provider=tts_provider)
+                paths = await tts_mod.synthesize_chunked(reply, provider=tts_provider, speaking_rate=speaking_rate)
             else:
-                paths = [await tts_mod.synthesize(reply, provider=tts_provider)]
+                paths = [await tts_mod.synthesize(reply, provider=tts_provider, speaking_rate=speaking_rate)]
             audio_urls = [f"/audio/{p.name}" for p in paths]
         except HTTPException:
             raise

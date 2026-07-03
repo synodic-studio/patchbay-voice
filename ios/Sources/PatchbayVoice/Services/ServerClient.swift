@@ -103,6 +103,7 @@ struct ServerClient {
         field(into: &body, boundary: boundary, name: "chunked_audio", value: "true")
         if let sp = settings.savePath { field(into: &body, boundary: boundary, name: "save_path", value: sp) }
         if let tp = settings.ttsProvider { field(into: &body, boundary: boundary, name: "tts_provider", value: tp) }
+        field(into: &body, boundary: boundary, name: "speaking_rate", value: String(format: "%.2f", settings.speakingRate))
         if settings.autoCommit { field(into: &body, boundary: boundary, name: "auto_commit", value: "true") }
         if settings.createAgentsMD { field(into: &body, boundary: boundary, name: "create_agents_md", value: "true") }
         if settings.createClaudeMD { field(into: &body, boundary: boundary, name: "create_claude_md", value: "true") }

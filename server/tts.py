@@ -10,7 +10,9 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
-from config import AUDIO_DIR, GOOGLE_TTS_VOICE, TTS_VOICE
+from config import AUDIO_DIR, GOOGLE_TTS_VOICE, TTS_SPEAKING_RATE, TTS_VOICE
+
+_SAY_BASE_WPM = 180  # approximate default WPM for macOS say voices
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -29,17 +31,20 @@ def _split_sentences(text: str) -> list[str]:
     return chunks or [text]
 
 
-async def synthesize(text: str, provider: str = "say") -> Path:
+async def synthesize(text: str, provider: str = "say", speaking_rate: float = TTS_SPEAKING_RATE) -> Path:
     if provider == "google":
-        return await _google_tts(text)
-    return await _say_tts(text)
+        return await _google_tts(text, speaking_rate=speaking_rate)
+    return await _say_tts(text, speaking_rate=speaking_rate)
 
 
-async def synthesize_chunked(text: str, provider: str = "say") -> list[Path]:
+async def synthesize_chunked(text: str, provider: str = "say", speaking_rate: float = TTS_SPEAKING_RATE) -> list[Path]:
     sentences = _split_sentences(text)
     if len(sentences) == 1:
-        return [await synthesize(text, provider)]
-    results = await asyncio.gather(*[synthesize(s, provider) for s in sentences], return_exceptions=True)
+        return [await synthesize(text, provider, speaking_rate=speaking_rate)]
+    results = await asyncio.gather(
+        *[synthesize(s, provider, speaking_rate=speaking_rate) for s in sentences],
+        return_exceptions=True,
+    )
     paths = []
     for r in results:
         if isinstance(r, Exception):
@@ -48,16 +53,17 @@ async def synthesize_chunked(text: str, provider: str = "say") -> list[Path]:
     return paths
 
 
-async def _say_tts(text: str) -> Path:
+async def _say_tts(text: str, speaking_rate: float = 1.0) -> Path:
     if not shutil.which("say"):
         raise HTTPException(500, "`say` not found — macOS only")
 
     uid = uuid.uuid4().hex
     aiff = AUDIO_DIR / f"{uid}.aiff"
     out = AUDIO_DIR / f"{uid}.m4a"
+    wpm = str(max(80, int(_SAY_BASE_WPM * speaking_rate)))
 
     def _run() -> None:
-        subprocess.run(["say", "-v", TTS_VOICE, "-o", str(aiff), "--", text], check=True)
+        subprocess.run(["say", "-v", TTS_VOICE, "-r", wpm, "-o", str(aiff), "--", text], check=True)
         subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", str(aiff), str(out)], check=True)
         aiff.unlink(missing_ok=True)
 
@@ -92,7 +98,7 @@ def _get_google_token() -> str:
     return _google_creds.token
 
 
-async def _google_tts(text: str) -> Path:
+async def _google_tts(text: str, speaking_rate: float = 1.0) -> Path:
     import httpx
 
     token = await asyncio.to_thread(_get_google_token)
@@ -102,7 +108,7 @@ async def _google_tts(text: str) -> Path:
     payload = {
         "input": {"text": text},
         "voice": {"languageCode": "en-US", "name": GOOGLE_TTS_VOICE},
-        "audioConfig": {"audioEncoding": "MP3", "speakingRate": 1.0},
+        "audioConfig": {"audioEncoding": "MP3", "speakingRate": max(0.25, min(4.0, speaking_rate))},
     }
 
     async with httpx.AsyncClient(timeout=15.0) as client:

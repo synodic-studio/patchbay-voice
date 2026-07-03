@@ -42,6 +42,8 @@ GOOGLE_TTS_SERVICE_ACCOUNT_JSON = environ.get("GOOGLE_TTS_SERVICE_ACCOUNT_JSON")
     "google-tts-service-account"
 )
 GOOGLE_TTS_VOICE = environ.get("GOOGLE_TTS_VOICE", "en-US-Chirp3-HD-Schedar")
+GOOGLE_TTS_SPEAKING_RATE = float(environ.get("GOOGLE_TTS_SPEAKING_RATE", "1.0"))
+TTS_SPEAKING_RATE = float(environ.get("TTS_SPEAKING_RATE", "1.0"))
 
 SYSTEM_PROMPT = (
     "You are a voice coding assistant accessed from a mobile phone. The user speaks to you "
@@ -68,7 +70,7 @@ SYSTEM_PROMPT = (
 
 HERE = Path(__file__).resolve().parent
 STATIC_DIR = HERE / "static"
-EXTENSION_PATH = HERE / "static" / "pi-extension" / "tools.ts"
+EXTENSION_PATH = HERE.parent / "pi" / "tools.ts"
 
 AUDIO_DIR = Path(tempfile.gettempdir()) / "voice-demo-audio"
 AUDIO_DIR.mkdir(exist_ok=True)

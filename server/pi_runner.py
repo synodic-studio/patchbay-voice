@@ -34,14 +34,32 @@ def _find_session_id(events: list[dict]) -> str | None:
 
 
 def _extract_text(events: list[dict]) -> str:
-    for msg in reversed(events):
-        if msg.get("type") == "agent_end":
-            parts = []
-            for block in msg.get("messages", []):
-                if block.get("role") == "assistant":
-                    parts.extend(b.get("text", "") for b in block.get("content", []) if b.get("text"))
-            return "\n".join(parts).strip()
-    return ""
+    # Track text_end/text_delta from message_update events — same approach as
+    # patchbay-relay's pi harness. Avoids pulling from agent_end.messages which
+    # mixes thinking blocks with reply text and requires reverse-searching for a
+    # terminator event.
+    texts: list[str] = []
+    pending: dict[int, list[str]] = {}
+    for ev in events:
+        if ev.get("type") != "message_update":
+            continue
+        ame = ev.get("assistantMessageEvent") or {}
+        kind = ame.get("type")
+        idx = ame.get("contentIndex", 0)
+        if kind == "text_delta":
+            delta = ame.get("delta", "")
+            if isinstance(delta, str) and delta:
+                pending.setdefault(idx, []).append(delta)
+        elif kind == "text_end":
+            content = ame.get("content")
+            if isinstance(content, str) and content:
+                texts.append(content)
+                pending.pop(idx, None)
+            elif idx in pending:
+                texts.append("".join(pending.pop(idx)))
+    for chunk in pending.values():
+        texts.append("".join(chunk))
+    return "\n".join(t for t in texts if t).strip()
 
 
 def _find_error(events: list[dict]) -> str | None:
@@ -70,6 +88,8 @@ async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/
             "-p",  # --print: non-interactive, process prompt and exit
             "--mode",
             "json",
+            "--thinking",
+            "off",  # disable reasoning to avoid polluting text extraction
             "--provider",
             PI_PROVIDER,
             "--model",

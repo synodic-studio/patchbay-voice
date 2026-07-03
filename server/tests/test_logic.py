@@ -101,18 +101,21 @@ class TestFindSessionId:
         assert _find_session_id([{"type": "session", "id": 123}]) is None
 
 
+def _msg_update(kind: str, content: str, idx: int = 0) -> dict:
+    """Build a message_update event as pi emits."""
+    ame: dict = {"type": kind, "contentIndex": idx}
+    if kind == "text_delta":
+        ame["delta"] = content
+    elif kind == "text_end":
+        ame["content"] = content
+    return {"type": "message_update", "assistantMessageEvent": ame}
+
+
 class TestExtractText:
-    def test_extracts_assistant_text(self):
+    def test_extracts_text_end(self):
         from pi_runner import _extract_text
 
-        events = [
-            {
-                "type": "agent_end",
-                "messages": [
-                    {"role": "assistant", "content": [{"text": "Hello there."}]},
-                ],
-            }
-        ]
+        events = [_msg_update("text_end", "Hello there.")]
         assert _extract_text(events) == "Hello there."
 
     def test_empty_events(self):
@@ -120,26 +123,39 @@ class TestExtractText:
 
         assert _extract_text([]) == ""
 
-    def test_uses_last_agent_end(self):
+    def test_accumulates_deltas_when_no_text_end(self):
         from pi_runner import _extract_text
 
         events = [
-            {"type": "agent_end", "messages": [{"role": "assistant", "content": [{"text": "first"}]}]},
-            {"type": "agent_end", "messages": [{"role": "assistant", "content": [{"text": "last"}]}]},
+            _msg_update("text_delta", "Hello "),
+            _msg_update("text_delta", "there."),
         ]
-        assert _extract_text(events) == "last"
+        assert _extract_text(events) == "Hello there."
 
-    def test_skips_non_assistant_messages(self):
+    def test_prefers_text_end_over_deltas(self):
         from pi_runner import _extract_text
 
         events = [
-            {
-                "type": "agent_end",
-                "messages": [
-                    {"role": "user", "content": [{"text": "ignored"}]},
-                    {"role": "assistant", "content": [{"text": "kept"}]},
-                ],
-            }
+            _msg_update("text_delta", "partial"),
+            _msg_update("text_end", "Hello there."),
+        ]
+        assert _extract_text(events) == "Hello there."
+
+    def test_multiple_content_blocks(self):
+        from pi_runner import _extract_text
+
+        events = [
+            _msg_update("text_end", "first", idx=0),
+            _msg_update("text_end", "second", idx=1),
+        ]
+        assert _extract_text(events) == "first\nsecond"
+
+    def test_ignores_non_message_update_events(self):
+        from pi_runner import _extract_text
+
+        events = [
+            {"type": "agent_end", "messages": [{"role": "assistant", "content": [{"text": "ignored"}]}]},
+            _msg_update("text_end", "kept"),
         ]
         assert _extract_text(events) == "kept"
 

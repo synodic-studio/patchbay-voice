@@ -5,6 +5,7 @@ struct SettingsView: View {
     @AppStorage("serverURL") private var serverURL = "http://localhost:8800"
     @AppStorage("audioResponseEnabled") private var audioResponseEnabled = true
     @AppStorage("ttsProvider") private var ttsProvider = "say"
+    @AppStorage("speakingRate") private var speakingRate = 1.0
     @AppStorage("defaultSavePath") private var defaultSavePath = "docs/patchbay/"
     @AppStorage("createAgentsMD") private var createAgentsMD = false
     @AppStorage("createClaudeMD") private var createClaudeMD = false
@@ -52,6 +53,17 @@ struct SettingsView: View {
                 Text("macOS Say").tag("say")
                 Text("Google Cloud").tag("google")
             }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Speaking rate")
+                    Spacer()
+                    Text(String(format: "%.1f×", speakingRate))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $speakingRate, in: 0.5 ... 2.0, step: 0.1)
+            }
+            .padding(.vertical, 2)
         }
     }
 
