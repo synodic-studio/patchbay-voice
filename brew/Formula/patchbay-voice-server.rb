@@ -9,43 +9,23 @@ class PatchbayVoiceServer < Formula
 
   def install
     # Install Python server sources into libexec
-    libexec.install "server/app.py"
-    libexec.install "server/asr.py"
-    libexec.install "server/chats.py"
-    libexec.install "server/config.py"
-    libexec.install "server/pi_runner.py"
-    libexec.install "server/tts.py"
-    (libexec/"routes").install "server/routes/__init__.py"
-    (libexec/"routes").install "server/routes/chats.py"
-    (libexec/"routes").install "server/routes/misc.py"
-    (libexec/"routes").install "server/routes/talk.py"
-    (libexec/"tests").install "server/tests/conftest.py"
-    (libexec/"tests").install "server/tests/test_routes.py"
-    (libexec/"tests").install "server/tests/test_logic.py"
+    libexec.install "server/app.py", "server/asr.py", "server/chats.py",
+                    "server/config.py", "server/pi_runner.py", "server/tts.py"
+    (libexec/"routes").install Dir["server/routes/*.py"]
+    (libexec/"tests").install Dir["server/tests/*.py"]
     libexec.install "server/pyproject.toml"
     (libexec/"web").install "web/index.html"
     (libexec/"pi").install "pi/tools.ts"
 
-    # Use uv sync for fast wheel-based install, then fix the venv to be portable
     cd(libexec) do
       system "uv", "sync"
 
-      # Fix .venv/pyvenv.cfg: uv writes a build-temp path as "home".
-      # Replace it with the actual uv-managed Python path so the venv
-      # works at runtime without uv needing to modify locked files.
-      real_home = `uv run python -c "import sys; print(sys.executable)"`.strip.sub(%r{/bin/python.*$}, "/bin")
-      (libexec/".venv/pyvenv.cfg").write <<~CFG
-        home = #{real_home}
-        implementation = CPython
-        uv = #{`uv --version`.strip.split.first}
-        version_info = #{`uv run python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"`.strip}
-        include-system-site-packages = false
-        prompt = patchbay-voice-server
-      CFG
-
-      # Create stable python3 symlink in the venv
-      system "ln", "-sf", "#{real_home}/python3", ".venv/bin/python3"
-      system "ln", "-sf", "#{real_home}/python3", ".venv/bin/python"
+      # Rewrite pyvenv.cfg "home" from build-temp to the actual uv-managed Python
+      real_python = `uv run python -c "import sys; print(sys.executable)"`.strip
+      real_bindir = File.dirname(real_python)
+      system "sed", "-i", "", "s|^home = .*|home = #{real_bindir}|", ".venv/pyvenv.cfg"
+      system "ln", "-sf", real_python, ".venv/bin/python3"
+      system "ln", "-sf", real_python, ".venv/bin/python"
 
       # Mark bundled dylibs immutable so Homebrew's post-install fixup
       # doesn't fail on oversize Mach-O headers (faster-whisper bundles
@@ -131,6 +111,7 @@ class PatchbayVoiceServer < Formula
     assert_match version.to_s, shell_output("#{bin}/patchbay-voice version 2>&1")
     assert_predicate libexec/"app.py", :exist?
     assert_predicate libexec/".venv/bin/python3", :exist?
+    assert_predicate libexec/".venv/bin/python", :exist?
     assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c \"from chats import Chat; print('ok')\"")
     assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c \"from pi_runner import _parse_events; print('ok')\"")
     assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c \"from tts import _split_sentences; print('ok')\"")
