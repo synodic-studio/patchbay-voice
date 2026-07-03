@@ -17,19 +17,17 @@ class PatchbayVoiceServer < Formula
     (libexec/"web").install "web/index.html"
     (libexec/"pi").install "pi/tools.ts"
 
-    # Find the actual uv-managed Python 3.14 BEFORE messing with the venv
-    # Use explicit version to avoid picking up Xcode's Python 3.9
-    real_python = `uv python find 3.14 2>/dev/null`.strip
-    real_bindir = File.dirname(real_python)
-
+    # Find REAL python path and fix the venv AFTER uv sync ensures Python 3.14
     cd(libexec) do
       system "uv", "sync"
-      # anyio needs exceptiongroup on Xcode's minimal Python
-      system "uv", "pip", "install", "--quiet", "exceptiongroup"
 
-      # Rewrite pyvenv.cfg "home" from build-temp to the actual uv-managed Python
+      # Discover the actual Python executable uv resolved to (after sync, it's guaranteed)
+      real_python = `uv run python -c "import sys,os; print(os.path.realpath(sys.executable))"`.strip
+      real_bindir = File.dirname(real_python)
+
+      # Rewrite pyvenv.cfg "home" from build-temp to the real Python path
       system "sed", "-i", "", "s|^home = .*|home = #{real_bindir}|", ".venv/pyvenv.cfg"
-      # Create proper python symlinks pointing to the real Python, not the venv
+      # Create proper python symlinks pointing to the real Python
       system "ln", "-sf", real_python, ".venv/bin/python3"
       system "ln", "-sf", real_python, ".venv/bin/python"
 
