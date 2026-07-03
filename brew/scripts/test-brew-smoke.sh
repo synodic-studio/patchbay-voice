@@ -43,8 +43,8 @@ TEST_IMPORTS=(
 )
 cd "$PB_LIBEXEC"
 for stmt in "${TEST_IMPORTS[@]}"; do
-    ERR=$(bin/python -c "$stmt" 2>&1 1>/dev/null) || true
-    if GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python -c "$stmt" 2>/dev/null; then
+    ERR=$(.venv/bin/python3 -c "$stmt" 2>&1 1>/dev/null) || true
+    if GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c "$stmt" 2>/dev/null; then
         pass "import: ${stmt%%;*}"
     else
         fail "import failed: ${stmt%%;*} — ${ERR}"
@@ -55,7 +55,7 @@ done
 echo ""
 echo "── 3. Pytest suite ──"
 cd "$PB_LIBEXEC"
-PYTEST_OUT=$(GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python -m pytest tests/ -q 2>&1 || true)
+PYTEST_OUT=$(GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test uv run python -m pytest tests/ -q 2>&1 || true)
 if echo "$PYTEST_OUT" | grep -q "passed"; then
     COUNT=$(echo "$PYTEST_OUT" | tail -1 | grep -oE '[0-9]+ passed' | cut -d' ' -f1)
     pass "pytest: $COUNT passed"
@@ -84,7 +84,7 @@ trap cleanup EXIT
 cd "$PB_LIBEXEC"
 DEVELOPER_DIR="$TMP_DEV" \
     GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test \
-    bin/python -m uvicorn app:app \
+    uv run uvicorn app:app \
     --host 127.0.0.1 --port "$PORT" --log-level error >"$LOG" 2>&1 &
 SERVER_PID=$!
 

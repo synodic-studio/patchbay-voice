@@ -20,12 +20,14 @@ class PatchbayVoiceServer < Formula
       system "uv", "sync"
       # Fix venv python symlinks to use absolute paths so uv run doesn't
       # recreate the entire venv on every invocation.
-      real_python = `uv run python -c "import sys; print(sys.executable)"`.strip
-      # Replace relative symlinks with absolute paths so uv doesn't recreate venv
+      # Fix python symlinks to absolute paths so uv doesn't recreate the venv
+      # on every invocation (uv ignores relative symlinks). Use the Homebrew
+      # Python that uv depends on.
+      real_python = "/opt/homebrew/opt/python@3.14/bin/python3.14"
       system "rm", "-f", ".venv/bin/python", ".venv/bin/python3", ".venv/bin/python3.14"
-      system "ln", "-s", real_python, ".venv/bin/python"
-      system "ln", "-s", real_python, ".venv/bin/python3"
-      system "ln", "-s", real_python, ".venv/bin/python3.14"
+      ln_s real_python, ".venv/bin/python"
+      ln_s real_python, ".venv/bin/python3"
+      ln_s real_python, ".venv/bin/python3.14"
     end
 
     (bin/"patchbay-voice").write <<~BASH
