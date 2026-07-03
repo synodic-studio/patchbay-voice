@@ -17,8 +17,9 @@ class PatchbayVoiceServer < Formula
     (libexec/"web").install "web/index.html"
     (libexec/"pi").install "pi/tools.ts"
 
-    # Find the actual uv-managed Python BEFORE messing with the venv
-    real_python = `uv python find 2>/dev/null`.strip
+    # Find the actual uv-managed Python 3.14 BEFORE messing with the venv
+    # Use explicit version to avoid picking up Xcode's Python 3.9
+    real_python = `uv python find 3.14 2>/dev/null`.strip
     real_bindir = File.dirname(real_python)
 
     cd(libexec) do
