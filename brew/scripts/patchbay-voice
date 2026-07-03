@@ -1,11 +1,12 @@
 #!/bin/bash
 # patchbay-voice — Run the Patchbay Voice server
 # Installed by Homebrew: brew install synodic/patchbay-voice/patchbay-voice-server
-# Standalone reference copy from brew/Formula/patchbay-voice-server.rb
+# Reference copy from brew/Formula/patchbay-voice-server.rb
 
 set -euo pipefail
 
 PB_LIBEXEC="${PB_LIBEXEC:-"$(cd "$(dirname "$0")/../libexec" && pwd)"}"
+VENV_PYTHON="${PB_LIBEXEC}/bin/python"
 
 _discover_urls() {
     local port="${VOICE_PORT:-8800}"
@@ -34,8 +35,7 @@ case "${1:-start}" in
         cd "$PB_LIBEXEC"
         export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         _discover_urls
-        uv sync --quiet 2>/dev/null || uv sync
-        exec uv run uvicorn app:app \
+        exec "$VENV_PYTHON" -m uvicorn app:app \
             --host "${VOICE_HOST:-0.0.0.0}" \
             --port "${VOICE_PORT:-8800}" \
             --log-level info

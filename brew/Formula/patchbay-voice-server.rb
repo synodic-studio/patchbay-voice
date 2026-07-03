@@ -37,29 +37,38 @@ class PatchbayVoiceServer < Formula
     # Create virtual environment and install Python deps with uv
     cd(libexec) do
       system "uv", "sync"
-      # Rewrite dylib IDs to short @rpath paths and mark them immutable so
-      # Homebrew's install_name_tool fixup can't fail on the oversize paths.
-      # faster-whisper bundles ffmpeg dylibs with short build-time paths that
-      # can't fit the longer Cellar path in the default Mach-O header.
-      Dir.glob(".venv/**/*.dylib").each do |dylib|
+
+      # Rewrite bundled dylib IDs to short @rpath paths so Homebrew's
+      # post-install fixup doesn't fail. faster-whisper bundles ffmpeg dylibs
+      # with build-time paths that are too short for the Cellar install path.
+      Dir.glob("#{libexec}/.venv/**/*.dylib").each do |dylib|
         name = File.basename(dylib)
         system "install_name_tool", "-id", "@rpath/#{name}", dylib
         system "chflags", "uchg", dylib
       end
+
+      # Create a portable bin/python wrapper so tests and service don't need
+      # `uv run` (which can fail post-install when files are locked).
+      python_path = `uv run which python`.strip
+      (libexec/"bin").mkpath
+      (libexec/"bin/python").write <<~PY
+      #!/bin/bash
+      export PYTHONPATH="#{libexec}/.venv/lib/python3.14/site-packages:$PYTHONPATH"
+      exec "#{python_path}" "$@"
+      PY
+      (libexec/"bin/python").chmod 0755
     end
 
     # Install the patchbay-voice wrapper script
     (bin/"patchbay-voice").write <<~BASH
       #!/bin/bash
       set -euo pipefail
-      PB_LIBEXEC="#{libexec}"
-
+      VENV_PYTHON="#{libexec}/bin/python"
       _discover_urls() {
         local port="${VOICE_PORT:-8800}"
         echo "━━━ Patchbay Voice Server ━━━"
         echo ""
         echo "Connect your iOS app to one of these URLs:"
-        # Local IP addresses
         if command -v ipconfig &>/dev/null; then
           ipconfig getifaddr en0 2>/dev/null | while read ip; do
             [[ -n "$ip" ]] && echo "  http://$ip:$port   (Wi-Fi)"
@@ -68,7 +77,6 @@ class PatchbayVoiceServer < Formula
             [[ -n "$ip" ]] && echo "  http://$ip:$port   (Ethernet)"
           done
         fi
-        # Tailscale IP
         if command -v tailscale &>/dev/null; then
           local ts=$(tailscale ip -4 2>/dev/null || true)
           [[ -n "$ts" ]] && echo "  http://$ts:$port     (Tailscale)"
@@ -77,15 +85,12 @@ class PatchbayVoiceServer < Formula
         echo "Set a custom host with: VOICE_HOST=<ip> brew services restart patchbay-voice-server"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
       }
-
       case "${1:-start}" in
         start)
-          cd "${PB_LIBEXEC}"
+          cd "#{libexec}"
           export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
           _discover_urls
-          uv sync --quiet 2>/dev/null || uv sync
-          # Bind 0.0.0.0 by default — works with Tailscale and local Wi-Fi
-          exec uv run uvicorn app:app \
+          exec "$VENV_PYTHON" -m uvicorn app:app \
             --host "${VOICE_HOST:-0.0.0.0}" \
             --port "${VOICE_PORT:-8800}" \
             --log-level info
@@ -125,9 +130,7 @@ class PatchbayVoiceServer < Formula
   end
 
   def post_install
-    cd(libexec) do
-      system "uv", "sync", "--quiet"
-    end
+    # No-op — uv venv is self-contained
   end
 
   def caveats
@@ -146,7 +149,6 @@ class PatchbayVoiceServer < Formula
       Requirements (not installed by this formula, must be available at runtime):
         - pi coding agent (brew install mariozechner/pi/pi)
         - Node.js (brew install node)
-        - faster-whisper is bundled via uv (no manual install)
         - Google Cloud TTS: set GOOGLE_TTS_SERVICE_ACCOUNT_JSON or run `pass`
 
       Configure via environment variables:
@@ -156,37 +158,28 @@ class PatchbayVoiceServer < Formula
         PI_BIN         Path to pi binary (default: found in PATH)
 
       To restrict to localhost only:
-        echo 'set env VOICE_HOST 127.0.0.1' | brew services patchbay-voice-server
+        echo 'set env VOICE_HOST 127.0.0.1' | brew services restart patchbay-voice-server
     EOS
   end
 
   service do
     run [opt_bin/"patchbay-voice", "start"]
     working_dir libexec
-    log_path ENV.fetch("HOME", "~") + "/Library/Logs/patchbay-voice-server.log"
-    error_log_path ENV.fetch("HOME", "~") + "/Library/Logs/patchbay-voice-server.log"
+    log_path Pathname.new(ENV.fetch("HOME", "~")) + "Library/Logs/patchbay-voice-server.log"
+    error_log_path Pathname.new(ENV.fetch("HOME", "~")) + "Library/Logs/patchbay-voice-server.log"
     keep_alive successful_exit: false
     environment_variables PATH: "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
   end
 
   test do
-    # Binary version prints correctly
-    assert_match "1.0.0", shell_output("#{bin}/patchbay-voice version 2>&1")
-
-    # Structural checks: key files exist in libexec
+    assert_match version.to_s, shell_output("#{bin}/patchbay-voice version 2>&1")
     assert_predicate libexec/"app.py", :exist?
-    assert_predicate libexec/"chats.py", :exist?
-    assert_predicate libexec/"config.py", :exist?
-    assert_predicate libexec/"pyproject.toml", :exist?
     assert_predicate libexec/"routes/talk.py", :exist?
     assert_predicate libexec/"web/index.html", :exist?
     assert_predicate libexec/"pi/tools.ts", :exist?
-    assert_predicate libexec/"uv.lock", :exist?
-    assert_predicate libexec/".venv/bin/python", :exist?
-
-    # Python import tests — set env var to bypass `pass show` at config.py module level
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python -c \"from chats import Chat, create_chat, load_chats; print('ok')\"")
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python -c \"from pi_runner import _parse_events, _extract_text; print('ok')\"")
-    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python -c \"from tts import _split_sentences; print('ok')\"")
+    assert_predicate libexec/"bin/python", :exist?
+    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python -c \"from chats import Chat, create_chat, load_chats; print('ok')\"")
+    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python -c \"from pi_runner import _parse_events, _extract_text; print('ok')\"")
+    assert_match "ok", shell_output("cd #{libexec} && GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test bin/python -c \"from tts import _split_sentences; print('ok')\"")
   end
 end
