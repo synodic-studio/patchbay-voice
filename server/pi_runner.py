@@ -88,8 +88,6 @@ async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/
             "-p",  # --print: non-interactive, process prompt and exit
             "--mode",
             "json",
-            "--thinking",
-            "off",  # disable reasoning to avoid polluting text extraction
             "--provider",
             PI_PROVIDER,
             "--model",
