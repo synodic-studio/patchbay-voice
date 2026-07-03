@@ -18,6 +18,14 @@ class PatchbayVoiceServer < Formula
 
     cd(libexec) do
       system "uv", "sync"
+      # Fix venv python symlinks to use absolute paths so uv run doesn't
+      # recreate the entire venv on every invocation.
+      real_python = `uv run python -c "import sys; print(sys.executable)"`.strip
+      # Replace relative symlinks with absolute paths so uv doesn't recreate venv
+      system "rm", "-f", ".venv/bin/python", ".venv/bin/python3", ".venv/bin/python3.14"
+      system "ln", "-s", real_python, ".venv/bin/python"
+      system "ln", "-s", real_python, ".venv/bin/python3"
+      system "ln", "-s", real_python, ".venv/bin/python3.14"
     end
 
     (bin/"patchbay-voice").write <<~BASH
