@@ -1,6 +1,6 @@
 # Patchbay Voice
 
-Voice interface to [pi](https://github.com/earendil-works/pi-mono), a multi-model AI coding agent. Speak into your phone (or browser), pi codes, it speaks back.
+Voice interface to [pi](https://github.com/badlogic/pi-mono), a multi-model AI coding agent. Speak into your phone (or browser), pi codes, it speaks back.
 
 ## What it is
 
@@ -27,7 +27,7 @@ Sessions map one-to-one to directories under `~/Developer`. Each session carries
 ## System Requirements
 
 - **macOS** (server runs on your Mac)
-- **[pi](https://github.com/badlogicgames/pi-coding-agent)** coding agent in `$PATH` (`pi` binary)
+- **[pi](https://github.com/badlogic/pi-mono)** coding agent in `$PATH` (`pi` binary)
 - **[uv](https://github.com/astral-sh/uv)** for Python dependency management
 - **[Node.js](https://nodejs.org)** (required by pi to load the TypeScript extension)
 - **faster-whisper** (bundled via uv — no manual install)
@@ -38,7 +38,14 @@ Sessions map one-to-one to directories under `~/Developer`. Each session carries
 ```bash
 cd server
 uv sync
-uv run app.py
+uv run uvicorn app:app
+```
+
+Or use the convenience wrapper:
+
+```bash
+cd server
+./run.sh
 ```
 
 Runs on port 8800 by default. Configure with environment variables:
@@ -64,6 +71,28 @@ cp com.synodic.patchbay-voice-server.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.synodic.patchbay-voice-server.plist
 ```
 
+## Install via Homebrew
+
+The server is also available via [synodic-studio/homebrew-synodic](https://github.com/synodic-studio/homebrew-synodic) (private repo, SSH):
+
+```bash
+brew tap synodic-studio/synodic git@github.com:synodic-studio/homebrew-synodic.git
+brew install --HEAD synodic-studio/synodic/patchbay-voice-server
+brew services start synodic-studio/synodic/patchbay-voice-server
+```
+
+The server binds `127.0.0.1` by default. To expose it on your LAN or Tailscale network, set `VOICE_HOST` (e.g. `0.0.0.0`, or a Tailscale `100.x.x.x` IP for device-specific access):
+
+```bash
+VOICE_HOST=0.0.0.0 patchbay-voice start          # foreground
+launchctl setenv VOICE_HOST 0.0.0.0 && \
+  brew services restart synodic-studio/synodic/patchbay-voice-server   # as a service
+```
+
+(Plain `VOICE_HOST=… brew services start` does not work — shell environment variables don't propagate into launchd-managed services.) Run `patchbay-voice urls` to print connection URLs.
+
+> **Pick one approach.** The Homebrew formula and the repo-checkout LaunchAgent plist (above) manage the same service. Choose one — do not load both.
+
 ## The pi Extension
 
 The file `pi/tools.ts` is a pi extension that registers a single `write_file` tool. It constrains all file saves to a configured directory (`VOICE_SAVE_PATH` env var, defaulting to `docs/patchbay/` inside the session's project dir). This is the only tool pi has access to — no shell, no git, no arbitrary writes.
@@ -73,6 +102,8 @@ pi loads the extension automatically via `--extension` on every invocation.
 ## Web Client
 
 A single-file HTML/JS/CSS app at `web/index.html`, served by the server at `GET /`. No build step. Mirrors the iOS app: sessions list, talk screen with hold-to-talk mic, keyboard fallback, settings panel. Works in any modern browser.
+
+> **Microphone requires a secure context.** The hold-to-talk feature uses `getUserMedia`, which browsers only allow on `https://` or `localhost`. The server serves plain `http://<lan-or-tailscale-ip>:8800`, so voice input will not work over LAN or Tailscale unless you front the server with HTTPS (e.g. `tailscale serve`). Text input always works.
 
 ## iOS App
 
