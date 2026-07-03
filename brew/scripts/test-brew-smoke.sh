@@ -23,7 +23,7 @@ else
 fi
 
 VERSION=$(patchbay-voice version 2>&1)
-if [[ "$VERSION" == "Patchbay Voice Server HEAD-"* ]]; then
+if [[ "$VERSION" == "Patchbay Voice Server HEAD"* ]]; then
     pass "version: $VERSION"
 else
     fail "unexpected version: $VERSION"
