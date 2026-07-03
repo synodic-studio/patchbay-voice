@@ -879,9 +879,10 @@ let activeChatId = null;
 let activeChatDir = null;
 let localMessages = {};
 let keyboardMode = false;
-let audioEnabled = true;
+let audioEnabled = settings.audioResponse;
 let audioEl = null;
 let audioQueue = [];
+let audioBlockedHintShown = false;
 let micRecorder = null;
 let micChunks = [];
 let allChats = [];
@@ -907,7 +908,7 @@ function reltime(ts) {
 }
 
 function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── Views ─────────────────────────────────────────────────────────────────────
@@ -1138,16 +1139,38 @@ function onTurnResult(data, addTranscript) {
 }
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
+function advanceAudioQueue() {
+  audioQueue.shift();
+  if (audioQueue.length) {
+    audioEl.src = audioQueue[0];
+    audioEl.play().catch(() => {
+      advanceAudioQueue();
+      if (!audioBlockedHintShown) {
+        audioBlockedHintShown = true;
+        setStatus('🔇 Audio blocked — tap to enable');
+        setTimeout(() => setStatus(null), 4000);
+      }
+    });
+  }
+}
+
 function playQueue(urls) {
   if (!audioEl) {
     audioEl = new Audio();
-    audioEl.onended = () => {
-      audioQueue.shift();
-      if (audioQueue.length) { audioEl.src = audioQueue[0]; audioEl.play().catch(()=>{}); }
-    };
+    audioEl.onended = advanceAudioQueue;
   }
   audioQueue.push(...urls);
-  if (audioQueue.length === urls.length) { audioEl.src = audioQueue[0]; audioEl.play().catch(()=>{}); }
+  if (audioQueue.length === urls.length) {
+    audioEl.src = audioQueue[0];
+    audioEl.play().catch(() => {
+      advanceAudioQueue();
+      if (!audioBlockedHintShown) {
+        audioBlockedHintShown = true;
+        setStatus('🔇 Audio blocked — tap to enable');
+        setTimeout(() => setStatus(null), 4000);
+      }
+    });
+  }
 }
 
 function stopAudio() {
@@ -1179,7 +1202,13 @@ document.getElementById('set-rate').oninput = e => {
   document.getElementById('rate-val').textContent = `${settings.speakingRate.toFixed(1)}×`;
   saveSettings();
 };
-document.getElementById('set-audio-resp').onchange = e => { settings.audioResponse = e.target.checked; saveSettings(); };
+document.getElementById('set-audio-resp').onchange = e => {
+  settings.audioResponse = e.target.checked;
+  audioEnabled = e.target.checked;
+  document.getElementById('speaker-side').classList.toggle('muted', !audioEnabled);
+  if (!audioEnabled) stopAudio();
+  saveSettings();
+};
 document.getElementById('set-save-path').onchange = e => { settings.savePath = e.target.value; saveSettings(); };
 document.getElementById('set-auto-commit').onchange = e => { settings.autoCommit = e.target.checked; saveSettings(); };
 
@@ -1236,8 +1265,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('speaker-side').onclick = () => {
     audioEnabled = !audioEnabled;
+    settings.audioResponse = audioEnabled;
     document.getElementById('speaker-side').classList.toggle('muted', !audioEnabled);
+    document.getElementById('set-audio-resp').checked = audioEnabled;
     if (!audioEnabled) stopAudio();
+    saveSettings();
   };
 
   document.getElementById('send-btn').onclick = () => sendText(document.getElementById('text-input').value);
@@ -1250,6 +1282,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Init
   applySettingsToUI();
+  document.getElementById('speaker-side').classList.toggle('muted', !audioEnabled);
   loadSessions();
 });
 </script>
