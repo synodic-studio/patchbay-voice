@@ -17,13 +17,16 @@ class PatchbayVoiceServer < Formula
     (libexec/"web").install "web/index.html"
     (libexec/"pi").install "pi/tools.ts"
 
+    # Find the actual uv-managed Python BEFORE messing with the venv
+    real_python = `uv python find 2>/dev/null`.strip
+    real_bindir = File.dirname(real_python)
+
     cd(libexec) do
       system "uv", "sync"
 
       # Rewrite pyvenv.cfg "home" from build-temp to the actual uv-managed Python
-      real_python = `uv run python -c "import sys; print(sys.executable)"`.strip
-      real_bindir = File.dirname(real_python)
       system "sed", "-i", "", "s|^home = .*|home = #{real_bindir}|", ".venv/pyvenv.cfg"
+      # Create proper python symlinks pointing to the real Python, not the venv
       system "ln", "-sf", real_python, ".venv/bin/python3"
       system "ln", "-sf", real_python, ".venv/bin/python"
 
