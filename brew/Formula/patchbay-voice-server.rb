@@ -37,17 +37,20 @@ class PatchbayVoiceServer < Formula
     # Create virtual environment and install Python deps with uv
     cd(libexec) do
       system "uv", "sync"
-      # Rewrite dylib IDs to short @rpath paths so Homebrew's install_name_tool
+      # Rewrite dylib IDs to short relative paths so Homebrew's install_name_tool
       # fixup can succeed (faster-whisper bundles ffmpeg dylibs with long build
       # paths that don't fit in the default header).
       system ".venv/bin/python", "-c", """
-import subprocess, pathlib, sys
+import subprocess, pathlib, os, stat
 for dylib in pathlib.Path('.venv').rglob('*.dylib'):
+    # Set short @rpath ID that fits in the default header
     try:
         subprocess.run(['install_name_tool', '-id', '@rpath/' + dylib.name, str(dylib)],
                        capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
-        print(f'skip {dylib.name}: {e.stderr.decode().strip()}', file=sys.stderr)
+        print(f'skip id {dylib.name}: {e.stderr.decode().strip()}', file=sys.stderr)
+    # Remove write permission so Homebrew's post-install fixup skips this file
+    dylib.chmod(dylib.stat().st_mode & ~stat.S_IWUSR & ~stat.S_IWGRP & ~stat.S_IWOTH)
 """
     end
 
@@ -56,12 +59,38 @@ for dylib in pathlib.Path('.venv').rglob('*.dylib'):
       #!/bin/bash
       set -euo pipefail
       PB_LIBEXEC="#{libexec}"
+
+      _discover_urls() {
+        local port="${VOICE_PORT:-8800}"
+        echo "━━━ Patchbay Voice Server ━━━"
+        echo ""
+        echo "Connect your iOS app to one of these URLs:"
+        # Local IP addresses
+        if command -v ipconfig &>/dev/null; then
+          ipconfig getifaddr en0 2>/dev/null | while read ip; do
+            [[ -n "$ip" ]] && echo "  http://$ip:$port   (Wi-Fi)"
+          done
+          ipconfig getifaddr en1 2>/dev/null | while read ip; do
+            [[ -n "$ip" ]] && echo "  http://$ip:$port   (Ethernet)"
+          done
+        fi
+        # Tailscale IP
+        if command -v tailscale &>/dev/null; then
+          local ts=$(tailscale ip -4 2>/dev/null || true)
+          [[ -n "$ts" ]] && echo "  http://$ts:$port     (Tailscale)"
+        fi
+        echo ""
+        echo "Set a custom host with: VOICE_HOST=<ip> brew services restart patchbay-voice-server"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      }
+
       case "${1:-start}" in
         start)
           cd "${PB_LIBEXEC}"
           export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          _discover_urls
           uv sync --quiet 2>/dev/null || uv sync
-          # Bind 0.0.0.0 by default so the server is reachable via Tailscale
+          # Bind 0.0.0.0 by default — works with Tailscale and local Wi-Fi
           exec uv run uvicorn app:app \
             --host "${VOICE_HOST:-0.0.0.0}" \
             --port "${VOICE_PORT:-8800}" \
@@ -70,8 +99,10 @@ for dylib in pathlib.Path('.venv').rglob('*.dylib'):
         status)
           if brew services list 2>/dev/null | grep -q "patchbay-voice-server.*started"; then
             echo "Running (brew services)"
+            _discover_urls
           elif launchctl list | grep -q "com.synodic.patchbay-voice-server"; then
             echo "Running"
+            _discover_urls
           else
             echo "Not running"
           fi
@@ -79,11 +110,20 @@ for dylib in pathlib.Path('.venv').rglob('*.dylib'):
         logs)
           exec tail -f "${HOME}/Library/Logs/patchbay-voice-server.log"
           ;;
+        urls)
+          _discover_urls
+          ;;
         version)
           echo "Patchbay Voice Server #{version}"
           ;;
         help|--help|-h|*)
-          echo "Usage: patchbay-voice <start|status|logs|version>"
+          echo "Usage: patchbay-voice <start|status|logs|urls|version>"
+          echo ""
+          echo "  start    Start the server (foreground)"
+          echo "  status   Show server status and connection URLs"
+          echo "  logs     Tail the server log"
+          echo "  urls     Show connection URLs for the iOS app"
+          echo "  version  Print version"
           ;;
       esac
     BASH
@@ -100,27 +140,29 @@ for dylib in pathlib.Path('.venv').rglob('*.dylib'):
     <<~EOS
       Patchbay Voice Server installed!
 
-      Start the server as a background service (recommended):
+      Start the server:
         brew services start patchbay-voice-server
 
-      Or run in the foreground:
-        patchbay-voice start
+      Find your iOS app connection URL:
+        patchbay-voice urls
 
       View logs:
         patchbay-voice logs
-        # or: brew services logs patchbay-voice-server
 
-      Requirements (not installed by this formula):
+      Requirements (not installed by this formula, must be available at runtime):
         - pi coding agent (brew install mariozechner/pi/pi)
         - Node.js (brew install node)
         - faster-whisper is bundled via uv (no manual install)
-        - Google Cloud service account (optional, for Cloud TTS)
+        - Google Cloud TTS: set GOOGLE_TTS_SERVICE_ACCOUNT_JSON or run `pass`
 
-      Configure via environment variables in ~/.zshrc or the plist override:
-        export VOICE_HOST=0.0.0.0  # already default, change to 127.0.0.1 for local-only
-        export VOICE_PORT=8800
-        export PI_MODEL=medium
-        export PI_BIN=/opt/homebrew/bin/pi
+      Configure via environment variables:
+        VOICE_HOST     Bind address (default: 0.0.0.0 — all interfaces)
+        VOICE_PORT     Port (default: 8800)
+        PI_MODEL       pi model (default: small)
+        PI_BIN         Path to pi binary (default: found in PATH)
+
+      To restrict to localhost only:
+        echo 'set env VOICE_HOST 127.0.0.1' | brew services patchbay-voice-server
     EOS
   end
 
