@@ -47,5 +47,10 @@ def get_audio(name: str):
     path = AUDIO_DIR / Path(name).name
     if not path.exists():
         raise HTTPException(404, "audio expired")
-    media = "audio/mp4" if path.suffix == ".m4a" else "audio/aiff"
+    if path.suffix == ".m4a":
+        media = "audio/mp4"
+    elif path.suffix == ".mp3":
+        media = "audio/mpeg"
+    else:
+        media = "application/octet-stream"
     return FileResponse(path, media_type=media)

@@ -47,7 +47,7 @@ class TestChatsRoutes:
     def test_create_response_has_required_fields(self, client, tmp_dev):
         r = client.post("/api/chats", json={"project_dir": "proj"})
         body = r.json()
-        for key in ("id", "name", "project_dir", "created_at", "last_active"):
+        for key in ("id", "name", "project_dir", "pi_session_id", "created_at", "last_active"):
             assert key in body, f"missing field: {key}"
 
     def test_create_missing_project_dir_returns_400(self, client):
@@ -332,6 +332,12 @@ class TestTalkAutoCommit:
         assert r.status_code == 200
         calls = [str(c) for c in mock_run.call_args_list]
         assert any("git" in c and "add" in c for c in calls)
+        # Verify 'git commit' includes '--' pathspec followed by the save path
+        commit_calls = [c for c in mock_run.call_args_list if "commit" in str(c)]
+        assert len(commit_calls) > 0, "Expected at least one git commit call"
+        commit_args = commit_calls[0][0][0]  # cmd list from first positional arg
+        assert "--" in commit_args, f"Missing '--' pathspec in commit args: {commit_args}"
+        assert "docs/patchbay/" in commit_args, f"Missing save path in commit args: {commit_args}"
 
     def test_auto_commit_false_skips_git(self, client, chat_id):
         with (
@@ -354,6 +360,156 @@ class TestTalkAutoCommit:
                 data={"chat_id": chat_id, "text": "hi", "audio_response": "false", "auto_commit": "true"},
             )
         assert r.status_code == 200
+
+
+# ── /api/talk — per-chat lock concurrency ──────────────────────────────────
+
+
+class TestTalkConcurrency:
+    """Per-chat asyncio.Lock serializes turns on the same chat."""
+
+    def test_same_chat_serializes(self, client, chat_id, tmp_dev):
+        import asyncio
+
+        import httpx
+        from unittest.mock import patch
+
+        import routes.misc as misc_mod
+        import routes.talk as talk_mod
+        import chats as chats_mod
+        from app import app
+
+        async def _run():
+            order: list[str] = []
+            first_entered = asyncio.Event()
+            first_can_exit = asyncio.Event()
+
+            async def mock_run_pi(transcript, chat, save_path="", model=""):
+                cid = chat.id
+                order.append(f"enter_{cid}")
+                if order.count(f"enter_{cid}") == 1:
+                    first_entered.set()
+                    await first_can_exit.wait()
+                order.append(f"exit_{cid}")
+                return "ok"
+
+            with (
+                patch.object(chats_mod, "DEVELOPER_DIR", tmp_dev),
+                patch.object(chats_mod, "CHATS_FILE", tmp_dev / "chats.json"),
+                patch.object(talk_mod, "DEVELOPER_DIR", tmp_dev),
+                patch.object(misc_mod, "DEVELOPER_DIR", tmp_dev),
+                patch("chats.save_chats", lambda: None),
+                patch.object(talk_mod, "run_pi", mock_run_pi),
+            ):
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                    t1 = asyncio.create_task(
+                        ac.post(
+                            "/api/talk",
+                            data={"chat_id": chat_id, "text": "hi", "audio_response": "false"},
+                        )
+                    )
+                    await asyncio.wait_for(first_entered.wait(), timeout=5)
+
+                    t2 = asyncio.create_task(
+                        ac.post(
+                            "/api/talk",
+                            data={"chat_id": chat_id, "text": "hi", "audio_response": "false"},
+                        )
+                    )
+                    await asyncio.sleep(0.3)
+
+                    # Second request must still be waiting for the lock
+                    assert order.count(f"enter_{chat_id}") == 1, (
+                        f"Second request entered before first finished: {order}"
+                    )
+
+                    first_can_exit.set()
+
+                    r1 = await t1
+                    r2 = await t2
+                    assert r1.status_code == 200
+                    assert r2.status_code == 200
+
+                    expected = [
+                        f"enter_{chat_id}",
+                        f"exit_{chat_id}",
+                        f"enter_{chat_id}",
+                        f"exit_{chat_id}",
+                    ]
+                    assert order == expected, f"Expected serialized, got: {order}"
+
+        asyncio.run(_run())
+
+    def test_different_chats_interleave(self, client, chat_id, tmp_dev):
+        r2 = client.post("/api/chats", json={"project_dir": "proj"})
+        chat_id2 = r2.json()["id"]
+
+        import asyncio
+
+        import httpx
+        from unittest.mock import patch
+
+        import routes.misc as misc_mod
+        import routes.talk as talk_mod
+        import chats as chats_mod
+        from app import app
+
+        async def _run():
+            order: list[str] = []
+            first_entered = asyncio.Event()
+            first_can_exit = asyncio.Event()
+
+            async def mock_run_pi(transcript, chat, save_path="", model=""):
+                cid = chat.id
+                order.append(f"enter_{cid}")
+                if cid == chat_id:
+                    first_entered.set()
+                    await first_can_exit.wait()
+                order.append(f"exit_{cid}")
+                return "ok"
+
+            with (
+                patch.object(chats_mod, "DEVELOPER_DIR", tmp_dev),
+                patch.object(chats_mod, "CHATS_FILE", tmp_dev / "chats.json"),
+                patch.object(talk_mod, "DEVELOPER_DIR", tmp_dev),
+                patch.object(misc_mod, "DEVELOPER_DIR", tmp_dev),
+                patch("chats.save_chats", lambda: None),
+                patch.object(talk_mod, "run_pi", mock_run_pi),
+            ):
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                    t1 = asyncio.create_task(
+                        ac.post(
+                            "/api/talk",
+                            data={"chat_id": chat_id, "text": "hi", "audio_response": "false"},
+                        )
+                    )
+                    await asyncio.wait_for(first_entered.wait(), timeout=5)
+
+                    t2 = asyncio.create_task(
+                        ac.post(
+                            "/api/talk",
+                            data={"chat_id": chat_id2, "text": "hi", "audio_response": "false"},
+                        )
+                    )
+                    # Give t2 time to enter while t1 is still blocked
+                    await asyncio.sleep(0.3)
+
+                    # Different chat must interleave (both enter before either exits)
+                    assert order.count(f"enter_{chat_id}") == 1
+                    assert order.count(f"enter_{chat_id2}") == 1, (
+                        f"Second chat should interleave, got: {order}"
+                    )
+
+                    first_can_exit.set()
+
+                    r1 = await t1
+                    r2 = await t2
+                    assert r1.status_code == 200
+                    assert r2.status_code == 200
+
+        asyncio.run(_run())
 
 
 # ── /api/talk — pi session persistence ───────────────────────────────────────
@@ -379,3 +535,14 @@ class TestTalkSession:
             r = client.post("/api/talk", data={"chat_id": chat_id, "text": "hi", "audio_response": "false"})
         assert r.status_code == 200
         mock_tts.assert_not_called()
+
+    def test_model_field_reaches_run_pi(self, client, chat_id):
+        with patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="ok") as mock_pi:
+            client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "hi", "audio_response": "false", "model": "gpt-4o"},
+            )
+        mock_pi.assert_awaited_once()
+        call = mock_pi.await_args
+        assert call is not None
+        assert call.kwargs.get("model") == "gpt-4o"

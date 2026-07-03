@@ -81,13 +81,15 @@ def _get_google_token() -> str:
     import google.auth.transport.requests
     import google.oauth2.service_account
 
-    from config import GOOGLE_TTS_SERVICE_ACCOUNT_JSON
+    from config import get_google_tts_credentials
 
-    if not GOOGLE_TTS_SERVICE_ACCOUNT_JSON:
+    creds_json = get_google_tts_credentials()
+
+    if not creds_json:
         raise HTTPException(500, "google-tts-service-account not found in pass")
 
     if _google_creds is None:
-        info = json.loads(GOOGLE_TTS_SERVICE_ACCOUNT_JSON)
+        info = json.loads(creds_json)
         _google_creds = google.oauth2.service_account.Credentials.from_service_account_info(
             info, scopes=["https://www.googleapis.com/auth/cloud-platform"]
         )

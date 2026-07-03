@@ -402,3 +402,231 @@ class TestLoadChatsInPlace:
             "Captured reference doesn't see loaded chats — "
             "load_chats() likely rebound _chats instead of updating in-place"
         )
+
+
+# ── pi_runner command-line construction ───────────────────────────────────────
+
+
+class TestPiCommandLine:
+    """Tests that the pi subprocess command line is built correctly.
+
+    We run_pi with a real-looking Chat and inspect the cmd list passed to
+    subprocess.run, which we intercept with a mock.
+    """
+
+    def _run_and_capture_cmd(self, chat, *, model="", save_path="docs/patchbay/"):
+        """Call run_pi and return the cmd list from the mocked subprocess.run."""
+        import sys
+        from unittest.mock import patch
+
+        from chats import save_chats
+        from pi_runner import run_pi
+
+        captured = {}
+
+        def _fake_run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            # Return something that looks like a valid CompletedProcess
+            import subprocess
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout='{"type":"session","id":"sess-1"}\n{"type":"agent_end","messages":[{"role":"assistant","content":[{"type":"text","text":"ok"}]}]}', stderr="")
+
+        with (
+            patch("pi_runner.subprocess.run", side_effect=_fake_run),
+            patch("pi_runner.save_chats", lambda: None),
+        ):
+            try:
+                import asyncio
+                asyncio.run(run_pi("hello", chat, save_path=save_path, model=model))
+            except Exception as exc:
+                # If the test fails elsewhere we still have the cmd
+                if "cmd" not in captured:
+                    raise exc
+        return captured.get("cmd", [])
+
+    def test_uses_configured_model_by_default(self):
+        from chats import Chat
+
+        chat = Chat(id="t1", name="test", project_dir="proj")
+        cmd = self._run_and_capture_cmd(chat)
+        # --model ... should be present and not empty
+        model_idx = cmd.index("--model") if "--model" in cmd else -1
+        assert model_idx >= 0, f"--model not found in cmd: {cmd}"
+        assert cmd[model_idx + 1] is not None
+        assert len(cmd[model_idx + 1]) > 0
+
+    def test_requested_model_appears_in_command_line(self):
+        from chats import Chat
+
+        chat = Chat(id="t2", name="test", project_dir="proj")
+        cmd = self._run_and_capture_cmd(chat, model="gpt-4o")
+        model_idx = cmd.index("--model")
+        assert cmd[model_idx + 1] == "gpt-4o", f"Expected gpt-4o, got {cmd[model_idx + 1]}"
+
+    def test_includes_lockdown_flags(self):
+        from chats import Chat
+
+        chat = Chat(id="t3", name="test", project_dir="proj")
+        cmd = self._run_and_capture_cmd(chat)
+        cmd_str = " ".join(cmd)
+        assert "--no-builtin-tools" in cmd_str, f"Missing --no-builtin-tools in {cmd}"
+        assert "--no-extensions" in cmd_str, f"Missing --no-extensions in {cmd}"
+        assert "--no-skills" in cmd_str, f"Missing --no-skills in {cmd}"
+
+    def test_includes_extension_path(self):
+        from chats import Chat
+
+        chat = Chat(id="t4", name="test", project_dir="proj")
+        cmd = self._run_and_capture_cmd(chat)
+        ext_idx = cmd.index("--extension") if "--extension" in cmd else -1
+        assert ext_idx >= 0, f"--extension not found in cmd: {cmd}"
+        assert cmd[ext_idx + 1].endswith("tools.ts")
+
+    def test_includes_session_id_when_present(self):
+        from chats import Chat
+
+        chat = Chat(id="t5", name="test", project_dir="proj", pi_session_id="sess-x")
+        cmd = self._run_and_capture_cmd(chat)
+        sess_idx = cmd.index("--session") if "--session" in cmd else -1
+        assert sess_idx >= 0, f"--session not found in cmd: {cmd}"
+        assert cmd[sess_idx + 1] == "sess-x"
+
+    def test_omits_session_id_when_none(self):
+        from chats import Chat
+
+        chat = Chat(id="t6", name="test", project_dir="proj", pi_session_id=None)
+        cmd = self._run_and_capture_cmd(chat)
+        assert "--session" not in cmd, f"--session should not be in cmd: {cmd}"
+
+
+# ── pi_runner PI_BIN None check ──────────────────────────────────────────────
+
+
+class TestPiBinNone:
+    def test_raises_500_with_clear_message(self):
+        """When PI_BIN is None, run_pi should fail fast with a helpful message."""
+        from unittest.mock import patch
+
+        from chats import Chat
+        from pi_runner import run_pi
+
+        chat = Chat(id="x1", name="test", project_dir="proj")
+
+        with (
+            patch("pi_runner.PI_BIN", None),
+            patch("pi_runner.save_chats", lambda: None),
+        ):
+            import asyncio
+
+            with pytest.raises(Exception) as exc_info:
+                asyncio.run(run_pi("hello", chat))
+
+        # Should be an HTTPException with status 500
+        from fastapi import HTTPException
+
+        assert isinstance(exc_info.value, HTTPException), f"Expected HTTPException, got {type(exc_info.value)}"
+        assert exc_info.value.status_code == 500
+        assert "pi binary not found" in exc_info.value.detail.lower()
+
+
+# ── chat_json includes pi_session_id ─────────────────────────────────────────
+
+
+class TestChatJson:
+    def test_includes_pi_session_id(self):
+        from chats import Chat, chat_json
+
+        chat = Chat(id="cj1", name="test", project_dir="proj", pi_session_id="sess-abc")
+        j = chat_json(chat)
+        assert j["pi_session_id"] == "sess-abc"
+
+    def test_pi_session_id_is_none_by_default(self):
+        from chats import Chat, chat_json
+
+        chat = Chat(id="cj2", name="test", project_dir="proj")
+        j = chat_json(chat)
+        assert j["pi_session_id"] is None
+
+
+# ── chat_json save_chats atomic write ────────────────────────────────────────
+
+
+class TestSaveChatsAtomic:
+    def test_writes_to_temp_file_then_replaces(self, tmp_path):
+        """save_chats should write to a temp file first, then os.replace."""
+        import json
+        from unittest.mock import patch
+
+        import chats as chats_mod
+
+        chat = chats_mod.Chat(id="a1", name="test", project_dir="proj")
+        chats_mod._chats[chat.id] = chat
+
+        chats_file = tmp_path / "voice-chats.json"
+        with patch.object(chats_mod, "CHATS_FILE", chats_file):
+            chats_mod.save_chats()
+
+        assert chats_file.exists(), f"File was not created: {chats_file}"
+        data = json.loads(chats_file.read_text())
+        assert "a1" in data["chats"]
+
+    def test_corrupt_file_recovers_on_next_write(self, tmp_path):
+        """A corrupted file should not prevent subsequent saves."""
+        import json
+        from unittest.mock import patch
+
+        import chats as chats_mod
+
+        chats_file = tmp_path / "voice-chats.json"
+        chats_file.write_text("{garbage}")  # corrupt
+
+        chat = chats_mod.Chat(id="b1", name="test", project_dir="proj")
+        chats_mod._chats[chat.id] = chat
+
+        with patch.object(chats_mod, "CHATS_FILE", chats_file):
+            chats_mod.save_chats()
+
+        # The file should now be valid JSON
+        data = json.loads(chats_file.read_text())
+        assert "b1" in data["chats"]
+
+
+# ── Audio MIME types ─────────────────────────────────────────────────────────
+
+
+class TestAudioMime:
+    def test_mp3_returns_audio_mpeg(self, client, tmp_path):
+        """MP3 files from Google TTS must be served as audio/mpeg."""
+        from config import AUDIO_DIR
+        from unittest.mock import patch
+
+        mp3 = tmp_path / "test.mp3"
+        mp3.write_bytes(b"fake mp3")
+
+        with patch("routes.misc.AUDIO_DIR", tmp_path):
+            r = client.get("/audio/test.mp3")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "audio/mpeg"
+
+    def test_m4a_returns_audio_mp4(self, client, tmp_path):
+        from config import AUDIO_DIR
+        from unittest.mock import patch
+
+        m4a = tmp_path / "test.m4a"
+        m4a.write_bytes(b"fake m4a")
+
+        with patch("routes.misc.AUDIO_DIR", tmp_path):
+            r = client.get("/audio/test.m4a")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "audio/mp4"
+
+    def test_unknown_extension_returns_octet_stream(self, client, tmp_path):
+        from config import AUDIO_DIR
+        from unittest.mock import patch
+
+        unknown = tmp_path / "test.wav"
+        unknown.write_bytes(b"fake wav")
+
+        with patch("routes.misc.AUDIO_DIR", tmp_path):
+            r = client.get("/audio/test.wav")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "application/octet-stream"

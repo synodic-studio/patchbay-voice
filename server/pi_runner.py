@@ -8,9 +8,33 @@ import sys
 from fastapi import HTTPException
 
 from chats import Chat, save_chats
-from config import DEVELOPER_DIR, EXTENSION_PATH, PI_BIN, PI_MODEL, PI_PROVIDER, SYSTEM_PROMPT
+from config import DEVELOPER_DIR, EXTENSION_PATH, PI_BIN, PI_MODEL, PI_PROVIDER
 
 PI_TIMEOUT = 120  # seconds
+
+
+BASE_SYSTEM_PROMPT = (
+    "You are a voice coding assistant accessed from a mobile phone. The user speaks to you "
+    "and your replies are read aloud by text-to-speech. Follow these rules strictly at all times:\n\n"
+    "Speak in plain English only. Never use markdown, headings, bullet points, numbered lists, "
+    "code blocks, backticks, bold, italics, URLs, or any other formatting meant for visual reading. "
+    "Write exactly as you would speak to someone on a phone call.\n\n"
+    "Keep answers short and conversational. One to three sentences unless the user clearly needs "
+    "more. When referring to code, describe it in plain words rather than quoting syntax.\n\n"
+    "Compose your entire reply before delivering it. Give one complete spoken response per turn "
+    "— not a series of chunks, sections, or partial thoughts.\n\n"
+    "The write_file tool is for saving notes, plans, and anything the user asks you to record "
+    "— for future reference and posterity, not for communicating information in the current "
+    "conversation. If you have something to say, say it in your reply. When the user asks you "
+    "to write or save something, use write_file freely within the permitted path.\n\n"
+    "The tools available to you were chosen deliberately.\n\n"
+    "* Do not attempt to work around their restrictions\n"
+    "* Do not chain tool calls to escape the {save_path} write boundary\n"
+    "* Do not modify, delete, or rename files outside {save_path}\n"
+    "* Do not use git tools to stage, commit, or push changes\n"
+    "* Do not proactively create documents to convey information — speak instead\n"
+    "* Do not look for workarounds when a restriction blocks you — explain what you cannot do instead"
+)
 
 
 def _parse_events(stdout: str) -> list[dict]:
@@ -60,10 +84,21 @@ def _find_error(events: list[dict]) -> str | None:
     return None
 
 
-async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/") -> str:
+async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/", model: str = "") -> str:
+    # Fail fast if pi isn't installed — don't let None propagate to subprocess
+    if PI_BIN is None:
+        raise HTTPException(
+            500,
+            "pi binary not found on PATH — install pi or set PI_BIN",
+        )
+
     cwd = str(DEVELOPER_DIR / chat.project_dir)
     # pi doesn't support -- terminator; guard against flag-like input from ASR
     safe_text = (" " + user_text) if user_text.startswith("-") else user_text
+
+    # Build the system prompt with the actual save path so the write boundary
+    # matches what the server and extension use.
+    system_prompt = BASE_SYSTEM_PROMPT.replace("{save_path}", save_path)
 
     def _run() -> tuple[str, str, int]:
         import os
@@ -81,13 +116,18 @@ async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/
             "json",
             "--provider",
             PI_PROVIDER,
-            "--model",
-            PI_MODEL,
         ]
+        # Thread the requested model (or fall back to the configured default)
+        active_model = model if model else PI_MODEL
+        cmd.extend(["--model", active_model])
+
         if chat.pi_session_id:
             cmd.extend(["--session", chat.pi_session_id])
-        cmd.extend(["--append-system-prompt", SYSTEM_PROMPT])
+        cmd.extend(["--append-system-prompt", system_prompt])
+        # Lock down: no built-in tools, no global extensions, no skills
         cmd.extend(["--no-builtin-tools"])
+        cmd.extend(["--no-extensions"])
+        cmd.extend(["--no-skills"])
         cmd.extend(["--extension", str(EXTENSION_PATH)])
         cmd.append(safe_text)
 

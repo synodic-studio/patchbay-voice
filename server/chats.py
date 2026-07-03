@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -36,11 +38,28 @@ def load_chats() -> None:
             {k: Chat(**{f: c.get(f) for f in Chat.__dataclass_fields__}) for k, c in raw.get("chats", {}).items()}
         )
     except Exception as exc:
-        print(f"[chats] load failed: {exc}", file=sys.stderr)
+        print(
+            f"[chats] *** WARNING *** load failed for {CHATS_FILE}: {exc} — "
+            f"starting with empty chat list. The file may be corrupt.",
+            file=sys.stderr,
+        )
 
 
 def save_chats() -> None:
-    CHATS_FILE.write_text(json.dumps({"chats": {c.id: asdict(c) for c in _chats.values()}}))
+    # Atomic write: write to a temp file in the same directory, then os.replace
+    # so a crash mid-write doesn't corrupt the JSON file.
+    data = json.dumps({"chats": {c.id: asdict(c) for c in _chats.values()}})
+    fd, tmp_path = tempfile.mkstemp(dir=str(CHATS_FILE.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(data)
+        os.replace(tmp_path, str(CHATS_FILE))
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def chat_json(c: Chat) -> dict:
@@ -48,6 +67,7 @@ def chat_json(c: Chat) -> dict:
         "id": c.id,
         "name": c.name,
         "project_dir": c.project_dir,
+        "pi_session_id": c.pi_session_id,
         "created_at": c.created_at,
         "last_active": c.last_active,
     }

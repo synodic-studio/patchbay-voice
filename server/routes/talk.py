@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import sys
 import time
@@ -17,6 +18,10 @@ from pi_runner import run_pi
 
 router = APIRouter()
 
+# Per-chat lock so overlapping turns on the same chat serialize.
+# Turns on different chats still run concurrently.
+_talk_locks: dict[str, asyncio.Lock] = {}
+
 
 @router.post("/api/talk")
 async def talk(
@@ -27,6 +32,7 @@ async def talk(
     tts_provider: str = Form(default="say"),
     speaking_rate: float = Form(default=1.0),
     chunked_audio: str = Form(default="false"),
+    model: str = Form(default=""),
     save_path: str = Form(default="docs/patchbay/"),
     auto_commit: str = Form(default="false"),
     create_agents_md: str = Form(default="false"),
@@ -36,84 +42,90 @@ async def talk(
     if not chat:
         raise HTTPException(404, "Chat not found")
 
-    want_audio = _truthy(audio_response)
-    want_chunked = _truthy(chunked_audio)
-    want_commit = _truthy(auto_commit)
+    # Serialize overlapping turns on the same chat
+    if chat_id not in _talk_locks:
+        _talk_locks[chat_id] = asyncio.Lock()
+    async with _talk_locks[chat_id]:
+        want_audio = _truthy(audio_response)
+        want_chunked = _truthy(chunked_audio)
+        want_commit = _truthy(auto_commit)
 
-    # Validate and resolve save_path
-    clean_save = save_path.strip().lstrip("/")
-    if clean_save.startswith("-") or ".." in Path(clean_save).parts:
-        raise HTTPException(400, "save_path must not contain ..")
-    project_dir = DEVELOPER_DIR / chat.project_dir
-    abs_save = (project_dir / clean_save).resolve()
-    if not str(abs_save).startswith(str(project_dir.resolve())):
-        raise HTTPException(400, "save_path must be inside the project directory")
+        # Validate and resolve save_path; default when empty
+        clean_save = save_path.strip().lstrip("/")
+        if not clean_save:
+            clean_save = "docs/patchbay"
+        if clean_save.startswith("-") or ".." in Path(clean_save).parts:
+            raise HTTPException(400, "save_path must not contain ..")
+        project_dir = DEVELOPER_DIR / chat.project_dir
+        abs_save = (project_dir / clean_save).resolve()
+        if not str(abs_save).startswith(str(project_dir.resolve())):
+            raise HTTPException(400, "save_path must be inside the project directory")
 
-    # Create save directory and optional init files
-    abs_save.mkdir(parents=True, exist_ok=True)
-    if _truthy(create_agents_md):
-        _ensure_file(abs_save / "AGENTS.md", "# Agent Notes\n\nContext saved by Patchbay Voice.\n")
-    if _truthy(create_claude_md):
-        _ensure_file(abs_save / "CLAUDE.md", "# Claude Context\n\nContext created by Patchbay Voice.\n")
+        # Create save directory and optional init files
+        abs_save.mkdir(parents=True, exist_ok=True)
+        if _truthy(create_agents_md):
+            _ensure_file(abs_save / "AGENTS.md", "# Agent Notes\n\nContext saved by Patchbay Voice.\n")
+        if _truthy(create_claude_md):
+            _ensure_file(abs_save / "CLAUDE.md", "# Claude Context\n\nContext created by Patchbay Voice.\n")
 
-    # Transcribe or use provided text
-    t_asr = 0.0
-    if text and text.strip():
-        transcript = text.strip()
-    elif audio is not None:
-        suffix = ".webm" if audio.filename and audio.filename.endswith(".webm") else ".m4a"
-        tmp = AUDIO_DIR / f"in-{uuid.uuid4().hex}{suffix}"
-        tmp.write_bytes(await audio.read())
-        t0 = time.time()
-        transcript = await asr_mod.transcribe(tmp)
-        tmp.unlink(missing_ok=True)
-        t_asr = time.time() - t0
-    else:
-        raise HTTPException(400, "Provide audio or text")
+        # Transcribe or use provided text
+        t_asr = 0.0
+        if text and text.strip():
+            transcript = text.strip()
+        elif audio is not None:
+            suffix = ".webm" if audio.filename and audio.filename.endswith(".webm") else ".m4a"
+            tmp = AUDIO_DIR / f"in-{uuid.uuid4().hex}{suffix}"
+            tmp.write_bytes(await audio.read())
+            t0 = time.time()
+            transcript = await asr_mod.transcribe(tmp)
+            tmp.unlink(missing_ok=True)
+            t_asr = time.time() - t0
+        else:
+            raise HTTPException(400, "Provide audio or text")
 
-    if not transcript:
-        return JSONResponse({"transcript": "", "reply": "No speech detected.", "audio_url": None, "audio_urls": []})
+        if not transcript:
+            return JSONResponse({"transcript": "", "reply": "No speech detected.", "audio_url": None, "audio_urls": []})
 
-    # Run pi
-    t1 = time.time()
-    reply = await run_pi(transcript, chat, save_path=clean_save)
-    t_llm = time.time() - t1
+        # Run pi
+        t1 = time.time()
+        reply = await run_pi(transcript, chat, save_path=clean_save, model=model)
+        t_llm = time.time() - t1
 
-    if want_commit:
-        _git_commit(project_dir, clean_save)
+        if want_commit:
+            _git_commit(project_dir, clean_save)
 
-    # TTS
-    audio_urls: list[str] = []
-    t2 = time.time()
-    if want_audio and reply:
-        try:
-            if want_chunked:
-                paths = await tts_mod.synthesize_chunked(reply, provider=tts_provider, speaking_rate=speaking_rate)
-            else:
-                paths = [await tts_mod.synthesize(reply, provider=tts_provider, speaking_rate=speaking_rate)]
-            audio_urls = [f"/audio/{p.name}" for p in paths]
-        except HTTPException:
-            raise
-        except Exception as exc:
-            print(f"[tts] error: {exc}", file=sys.stderr)
-    t_tts = time.time() - t2
+        # TTS
+        audio_urls: list[str] = []
+        t2 = time.time()
+        if want_audio and reply:
+            try:
+                if want_chunked:
+                    paths = await tts_mod.synthesize_chunked(reply, provider=tts_provider, speaking_rate=speaking_rate)
+                else:
+                    paths = [await tts_mod.synthesize(reply, provider=tts_provider, speaking_rate=speaking_rate)]
+                audio_urls = [f"/audio/{p.name}" for p in paths]
+            except HTTPException:
+                raise
+            except Exception as exc:
+                print(f"[tts] error: {exc}", file=sys.stderr)
+        t_tts = time.time() - t2
 
-    chat.last_active = time.time()
-    save_chats()
+        chat.last_active = time.time()
+        save_chats()
 
-    print(
-        f"[turn] {transcript[:60]!r} asr={t_asr:.1f}s llm={t_llm:.1f}s tts={t_tts:.1f}s"
-        f" | q={len(transcript)} a={len(reply)} chunks={len(audio_urls)} provider={tts_provider}"
-    )
+        print(
+            f"[turn] {transcript[:60]!r} asr={t_asr:.1f}s llm={t_llm:.1f}s tts={t_tts:.1f}s"
+            f" | q={len(transcript)} a={len(reply)} chunks={len(audio_urls)} provider={tts_provider}"
+        )
 
-    return JSONResponse(
-        {
-            "transcript": transcript,
-            "reply": reply,
-            "audio_url": audio_urls[0] if audio_urls else None,
-            "audio_urls": audio_urls,
-        }
-    )
+        return JSONResponse(
+            {
+                "transcript": transcript,
+                "reply": reply,
+                "audio_url": audio_urls[0] if audio_urls else None,
+                "audio_urls": audio_urls,
+            }
+        )
 
 
 def _truthy(val: str) -> bool:
@@ -136,7 +148,7 @@ def _git_commit(project_dir: Path, save_path: str) -> None:
         )
         if diff.returncode != 0:
             subprocess.run(
-                ["git", "commit", "-m", "voice: save notes"],
+                ["git", "commit", "-m", "voice: save notes", "--", save_path],
                 cwd=str(project_dir),
                 capture_output=True,
                 timeout=15,
