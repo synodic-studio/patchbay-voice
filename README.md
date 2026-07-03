@@ -1,6 +1,6 @@
 # Patchbay Voice
 
-iOS voice interface to [pi](https://github.com/badlogicgames/pi-coding-agent), a multi-model AI coding agent. Speak into your phone, pi codes, it speaks back.
+Voice interface to [pi](https://github.com/earendil-works/pi-mono), a multi-model AI coding agent. Speak into your phone (or browser), pi codes, it speaks back.
 
 ## What it is
 
@@ -8,18 +8,18 @@ A two-part system: an iOS app and a local server that runs on the same machine a
 
 You hold a button, say what you want built. The server transcribes it with faster-whisper, sends it to pi (via a custom extension bundled in the repo), and streams the response back as audio. The whole exchange is stored per-session so context accumulates across turns.
 
-The design is headless-first: the iOS app is the only interface. There is no dashboard, no browser tab, no terminal you need to look at.
+Two clients ship with the repo: a native iOS app and a single-file web client served directly by the server at `GET /`. Both share the same API.
 
 ## Architecture
 
 ```
-iOS app (Patchbay Voice)
+iOS app or web client (GET / → web/index.html)
   └── Hold to talk / type a message
       └── POST /api/talk → server
             ├── faster-whisper (local transcription)
-            ├── pi --print --mode json --session <id> --extension server/static/pi-extension/tools.ts
+            ├── pi --print --mode json --session <id> --extension pi/tools.ts
             └── Google Cloud TTS or macOS say (audio response)
-                └── Audio chunks streamed back to app
+                └── Audio chunks streamed back to client
 ```
 
 Sessions map one-to-one to directories under `~/Developer`. Each session carries a pi session ID so pi maintains context across turns.
@@ -66,9 +66,13 @@ launchctl load ~/Library/LaunchAgents/com.synodic.patchbay-voice-server.plist
 
 ## The pi Extension
 
-The file `server/static/pi-extension/tools.ts` is a pi extension that registers a single `write_file` tool. It constrains all file saves to a configured directory (`VOICE_SAVE_PATH` env var, defaulting to `docs/patchbay/` inside the session's project dir). This is the only tool pi has access to — no shell, no git, no arbitrary writes.
+The file `pi/tools.ts` is a pi extension that registers a single `write_file` tool. It constrains all file saves to a configured directory (`VOICE_SAVE_PATH` env var, defaulting to `docs/patchbay/` inside the session's project dir). This is the only tool pi has access to — no shell, no git, no arbitrary writes.
 
 pi loads the extension automatically via `--extension` on every invocation.
+
+## Web Client
+
+A single-file HTML/JS/CSS app at `web/index.html`, served by the server at `GET /`. No build step. Mirrors the iOS app: sessions list, talk screen with hold-to-talk mic, keyboard fallback, settings panel. Works in any modern browser.
 
 ## iOS App
 
