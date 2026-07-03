@@ -37,20 +37,20 @@ class PatchbayVoiceServer < Formula
     # Create virtual environment and install Python deps with uv
     cd(libexec) do
       system "uv", "sync"
-      # Rewrite dylib IDs to short relative paths so Homebrew's install_name_tool
-      # fixup can succeed (faster-whisper bundles ffmpeg dylibs with long build
-      # paths that don't fit in the default header).
+      # Rewrite dylib IDs to short @rpath paths and mark them immutable so
+      # Homebrew's install_name_tool fixup can't fail on the oversize paths.
+      # faster-whisper bundles ffmpeg dylibs with short build-time paths that
+      # can't fit the longer Cellar path in the default Mach-O header.
       system ".venv/bin/python", "-c", """
-import subprocess, pathlib, os, stat
+import subprocess, pathlib
 for dylib in pathlib.Path('.venv').rglob('*.dylib'):
-    # Set short @rpath ID that fits in the default header
     try:
         subprocess.run(['install_name_tool', '-id', '@rpath/' + dylib.name, str(dylib)],
                        capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f'skip id {dylib.name}: {e.stderr.decode().strip()}', file=sys.stderr)
-    # Remove write permission so Homebrew's post-install fixup skips this file
-    dylib.chmod(dylib.stat().st_mode & ~stat.S_IWUSR & ~stat.S_IWGRP & ~stat.S_IWOTH)
+    # Immutable flag prevents Homebrew's post-install fixup from touching it
+    subprocess.run(['chflags', 'uchg', str(dylib)], capture_output=True)
 """
     end
 
