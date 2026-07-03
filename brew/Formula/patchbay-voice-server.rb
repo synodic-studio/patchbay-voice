@@ -41,17 +41,11 @@ class PatchbayVoiceServer < Formula
       # Homebrew's install_name_tool fixup can't fail on the oversize paths.
       # faster-whisper bundles ffmpeg dylibs with short build-time paths that
       # can't fit the longer Cellar path in the default Mach-O header.
-      system ".venv/bin/python", "-c", """
-import subprocess, pathlib
-for dylib in pathlib.Path('.venv').rglob('*.dylib'):
-    try:
-        subprocess.run(['install_name_tool', '-id', '@rpath/' + dylib.name, str(dylib)],
-                       capture_output=True, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f'skip id {dylib.name}: {e.stderr.decode().strip()}', file=sys.stderr)
-    # Immutable flag prevents Homebrew's post-install fixup from touching it
-    subprocess.run(['chflags', 'uchg', str(dylib)], capture_output=True)
-"""
+      Dir.glob(".venv/**/*.dylib").each do |dylib|
+        name = File.basename(dylib)
+        system "install_name_tool", "-id", "@rpath/#{name}", dylib
+        system "chflags", "uchg", dylib
+      end
     end
 
     # Install the patchbay-voice wrapper script
