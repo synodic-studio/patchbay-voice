@@ -20,13 +20,16 @@ class PatchbayVoiceServer < Formula
     # Create a standard venv with Homebrew's Python and pip-install deps.
     # uv sync is faster but creates non-portable venvs tied to build-time paths.
     venv = virtualenv_create(libexec, "python3.14")
-    venv.pip_install "fastapi>=0.138.1"
-    venv.pip_install "uvicorn>=0.49.0"
-    venv.pip_install "faster-whisper>=1.2.1"
-    venv.pip_install "python-multipart>=0.0.32"
-    venv.pip_install "httpx>=0.28.0"
-    venv.pip_install "google-auth>=2.40.0"
-    venv.pip_install "requests>=2.32.0"
+    # Install deps via pip inside the venv (Homebrew's pip_install uses --no-deps)
+    pip = "#{libexec}/bin/pip"
+    system pip, "install", "--quiet", "starlette>=0.46.0"
+    system pip, "install", "--quiet", "fastapi>=0.138.1"
+    system pip, "install", "--quiet", "uvicorn>=0.49.0"
+    system pip, "install", "--quiet", "faster-whisper>=1.2.1"
+    system pip, "install", "--quiet", "python-multipart>=0.0.32"
+    system pip, "install", "--quiet", "httpx>=0.28.0"
+    system pip, "install", "--quiet", "google-auth>=2.40.0"
+    system pip, "install", "--quiet", "requests>=2.32.0"
 
     # Mark bundled dylibs immutable so Homebrew's post-install fixup
     # doesn't fail on oversize Mach-O headers (faster-whisper bundles ffmpeg
