@@ -888,7 +888,7 @@ async function sendText(text) {
     const fd = buildFormData();
     fd.append('text', text);
     const data = await api('POST', '/api/talk', fd);
-    onTurnResult(data);
+    onTurnResult(data, false);
   } catch (e) {
     setStatusPill(null);
     addMessage('assistant', `Error: ${e.message}`);
@@ -910,9 +910,9 @@ function buildFormData() {
   return fd;
 }
 
-function onTurnResult(data) {
+function onTurnResult(data, addTranscript = true) {
   setStatusPill(null);
-  if (data.transcript) addMessage('user', data.transcript);
+  if (addTranscript && data.transcript) addMessage('user', data.transcript);
   if (data.reply) addMessage('assistant', data.reply);
   if (audioEnabled && data.audio_urls && data.audio_urls.length) {
     playAudioQueue(data.audio_urls);
