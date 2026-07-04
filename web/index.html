@@ -465,6 +465,13 @@ button {
   overflow: hidden;
 }
 
+.settings-footer {
+  text-align: center;
+  font-size: 13px;
+  color: var(--label3);
+  padding: 4px 20px calc(16px + var(--safe-bottom));
+}
+
 .s-row {
   display: flex;
   align-items: center;
@@ -838,6 +845,7 @@ input[type="range"]::-webkit-slider-thumb {
         </label>
       </div>
     </div>
+    <div class="settings-footer" id="settings-server-version"></div>
   </div>
 </div>
 
@@ -886,6 +894,7 @@ let audioBlockedHintShown = false;
 let micRecorder = null;
 let micChunks = [];
 let allChats = [];
+let serverVersionCache = null;
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -1178,6 +1187,22 @@ function stopAudio() {
   audioQueue = [];
 }
 
+// ── Server version ────────────────────────────────────────────────────────────
+async function loadServerVersion() {
+  const el = document.getElementById('settings-server-version');
+  if (serverVersionCache) {
+    el.textContent = serverVersionCache;
+    return;
+  }
+  try {
+    const data = await api('GET', '/api/version');
+    serverVersionCache = `Server ${data.version} \u00b7 ${data.source}`;
+    el.textContent = serverVersionCache;
+  } catch {
+    // show nothing on failure
+  }
+}
+
 // ── Settings UI ───────────────────────────────────────────────────────────────
 function applySettingsToUI() {
   document.getElementById('set-provider').value = settings.ttsProvider;
@@ -1233,7 +1258,7 @@ document.getElementById('set-model-custom').addEventListener('input', e => {
 document.addEventListener('DOMContentLoaded', () => {
   // Sessions screen
   document.getElementById('new-btn').onclick = openProjectSheet;
-  document.getElementById('settings-btn').onclick = () => { applySettingsToUI(); showScreen('settings'); };
+  document.getElementById('settings-btn').onclick = () => { applySettingsToUI(); showScreen('settings'); loadServerVersion(); };
   document.getElementById('sheet-close-btn').onclick = closeSheet;
   document.getElementById('project-sheet').addEventListener('click', e => {
     if (e.target.id === 'project-sheet') closeSheet();

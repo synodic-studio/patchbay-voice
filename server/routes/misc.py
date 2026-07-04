@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -12,9 +15,46 @@ from config import AUDIO_DIR, DEVELOPER_DIR, PI_BIN, PI_MODEL, PI_PROVIDER, STAT
 router = APIRouter()
 
 
+# ── Version (computed once at import time) ──────────────────────────────────────
+
+
+def _compute_version() -> tuple[str, str]:
+    """Return (version, source) resolved once at startup."""
+    server_dir = Path(__file__).resolve().parent.parent
+    build_info = server_dir / "BUILD_INFO"
+    if build_info.is_file():
+        return build_info.read_text().strip(), "homebrew"
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(server_dir),
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return f"git-{result.stdout.strip()}", "checkout"
+    except Exception:
+        pass
+    return "unknown", "unknown"
+
+
+SERVER_VERSION, SERVER_SOURCE = _compute_version()
+
+
 @router.get("/")
 def index():
     return HTMLResponse((STATIC_DIR / "index.html").read_text())
+
+
+@router.get("/api/version")
+def get_version():
+    return {
+        "version": SERVER_VERSION,
+        "source": SERVER_SOURCE,
+        "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        "pid": os.getpid(),
+    }
 
 
 @router.get("/healthz")
