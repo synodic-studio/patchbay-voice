@@ -1,18 +1,6 @@
 import Foundation
 import Observation
 
-struct TurnItem: Identifiable, Codable, Sendable {
-    let id: UUID
-    let transcript: String
-    let reply: String
-
-    init(transcript: String, reply: String) {
-        id = UUID()
-        self.transcript = transcript
-        self.reply = reply
-    }
-}
-
 @MainActor
 @Observable
 final class TalkViewModel {
@@ -67,7 +55,9 @@ final class TalkViewModel {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             _appendTurn(TurnItem(
                 transcript: "What changed in the last commit?",
-                reply: "Added the UITest target and accessibility identifiers. Sessions button, settings button, and session rows now have stable IDs so headless screenshot capture runs fully automated.",
+                reply: "Added the UITest target and accessibility identifiers."
+                    + " Sessions button, settings button, and session rows"
+                    + " now have stable IDs so headless screenshot capture runs fully automated.",
             ), chat: chat)
             isProcessing = false
         }
@@ -97,7 +87,11 @@ final class TalkViewModel {
         guard !lastAudioChunks.isEmpty else { return }
         try? player.playSequence(lastAudioChunks)
     }
+}
 
+// MARK: - Private processing
+
+extension TalkViewModel {
     private func _appendTurn(_ item: TurnItem, chat: Chat) {
         turns.append(item)
         if let data = try? JSONEncoder().encode(turns) {
@@ -144,16 +138,7 @@ final class TalkViewModel {
         guard !paths.isEmpty else { return }
         statusMessage = "Generating audio…"
         do {
-            let chunks = try await withThrowingTaskGroup(of: (Int, Data).self) { group in
-                for (i, path) in paths.enumerated() {
-                    group.addTask { try await (i, client.fetchAudio(path: path)) }
-                }
-                var result = [(Int, Data)]()
-                for try await pair in group {
-                    result.append(pair)
-                }
-                return result.sorted { $0.0 < $1.0 }.map(\.1)
-            }
+            let chunks = try await _fetchAllChunks(paths: paths, client: client)
             lastAudioChunks = chunks
             try player.playSequence(chunks)
         } catch {
@@ -161,13 +146,33 @@ final class TalkViewModel {
         }
     }
 
+    private func _fetchAllChunks(paths: [String], client: ServerClient) async throws -> [Data] {
+        try await withThrowingTaskGroup(of: (Int, Data).self) { group in
+            addFetchTasks(to: &group, paths: paths, client: client)
+            var result = [(Int, Data)]()
+            for try await pair in group {
+                result.append(pair)
+            }
+            return result.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+    }
+
+    private func addFetchTasks(
+        to group: inout ThrowingTaskGroup<(Int, Data), any Error>,
+        paths: [String], client: ServerClient,
+    ) {
+        for (offset, path) in paths.enumerated() {
+            group.addTask { try await (offset, client.fetchAudio(path: path)) }
+        }
+    }
+
     private func _drainPending(chat: Chat, client: ServerClient) async {
-        if let audio = pendingAudioData {
-            pendingAudioData = nil
-            await _processAudioTurn(audio: audio, chat: chat, client: client)
-        } else if let text = pendingText {
-            pendingText = nil
-            await _processTextTurn(text: "Queued while you were working: \(text)", chat: chat, client: client)
+        if let pendingAudioData {
+            self.pendingAudioData = nil
+            await _processAudioTurn(audio: pendingAudioData, chat: chat, client: client)
+        } else if let pendingText {
+            self.pendingText = nil
+            await _processTextTurn(text: "Queued while you were working: \(pendingText)", chat: chat, client: client)
         }
     }
 

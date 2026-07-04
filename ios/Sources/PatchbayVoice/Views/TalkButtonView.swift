@@ -3,12 +3,8 @@ import SwiftUI
 
 struct TalkButtonView: View {
     @Environment(ChatManager.self) private var chatManager
-    let vm: TalkViewModel
     @State private var permission: AVAudioApplication.recordPermission = .undetermined
-
-    private var isMockCapture: Bool {
-        CommandLine.arguments.contains("--uitesting-mock-turn")
-    }
+    let viewModel: TalkViewModel
 
     var body: some View {
         buttonForPermission
@@ -29,18 +25,21 @@ struct TalkButtonView: View {
         micCircle
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
-                    .onChanged { _ in if !vm.isCapturing { vm.startRecording() } }
+                    .onChanged { _ in
+                        guard !viewModel.isCapturing else { return }
+                        viewModel.startRecording()
+                    }
                     .onEnded { _ in
                         guard let chat = chatManager.currentChat else { return }
                         if isMockCapture {
-                            vm.mockTurn(chat: chat)
+                            viewModel.mockTurn(chat: chat)
                         } else {
-                            Task { await vm.stopAndSend(chat: chat, client: chatManager.client) }
+                            Task { await viewModel.stopAndSend(chat: chat, client: chatManager.client) }
                         }
                     },
             )
-            .disabled(vm.pendingAudioData != nil || chatManager.currentChat == nil)
-            .animation(.easeInOut(duration: 0.15), value: vm.isCapturing)
+            .disabled(viewModel.pendingAudioData != nil || chatManager.currentChat == nil)
+            .animation(.easeInOut(duration: 0.15), value: viewModel.isCapturing)
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel("Hold to talk")
@@ -49,18 +48,22 @@ struct TalkButtonView: View {
 
     private var micCircle: some View {
         ZStack {
-            if vm.isCapturing {
+            if viewModel.isCapturing {
                 Circle()
                     .fill(Color.blueAccent.opacity(0.20))
                     .frame(width: 100, height: 100)
             }
             Circle()
-                .fill(vm.isCapturing ? Color.red : Color.blueAccent)
+                .fill(viewModel.isCapturing ? Color.red : Color.blueAccent)
                 .frame(width: 78, height: 78)
-            Image(systemName: vm.isCapturing ? "waveform" : "mic.fill")
+            Image(systemName: viewModel.isCapturing ? "waveform" : "mic.fill")
                 .font(.system(size: 28))
                 .foregroundStyle(.white)
         }
+    }
+
+    private var isMockCapture: Bool {
+        CommandLine.arguments.contains("--uitesting-mock-turn")
     }
 
     private func permissionCircle(label: String, action: @escaping () -> Void) -> some View {
@@ -92,4 +95,9 @@ struct TalkButtonView: View {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
     }
+}
+
+#Preview {
+    TalkButtonView(viewModel: TalkViewModel())
+        .environment(ChatManager())
 }

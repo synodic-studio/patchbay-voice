@@ -5,6 +5,21 @@ struct NewChatView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
 
+    var body: some View {
+        NavigationStack {
+            chatList
+                .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
+                .navigationTitle("New Session")
+                .toolbar { toolbarContent }
+        }
+    }
+
+    @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button("Cancel") { dismiss() }
+        }
+    }
+
     private var available: [String] {
         let taken = Set(chatManager.chats.map(\.projectDir))
         let all = chatManager.projects
@@ -13,34 +28,31 @@ struct NewChatView: View {
         return search.isEmpty ? all : all.filter { $0.localizedCaseInsensitiveContains(search) }
     }
 
-    var body: some View {
-        NavigationStack {
-            List {
-                if !available.isEmpty {
-                    Section {
-                        ForEach(available, id: \.self) { project in
-                            repoRow(project)
-                        }
-                    } header: {
-                        Text("All repos · A–Z")
-                            .textCase(.uppercase)
-                            .font(.caption)
-                    }
+    private var chatList: some View {
+        List {
+            listContent
+        }
+        .overlay { emptyOverlay }
+    }
+
+    @ViewBuilder private var listContent: some View {
+        if !available.isEmpty {
+            Section {
+                ForEach(available, id: \.self) { project in
+                    repoRow(project)
                 }
+            } header: {
+                Text("All repos · A–Z")
+                    .textCase(.uppercase)
+                    .font(.caption)
             }
-            .overlay {
-                if available.isEmpty {
-                    Text("All projects have sessions")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
-            .navigationTitle("New Session")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
+        }
+    }
+
+    @ViewBuilder private var emptyOverlay: some View {
+        if available.isEmpty {
+            Text("All projects have sessions")
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -64,4 +76,9 @@ struct NewChatView: View {
             }
         }
     }
+}
+
+#Preview {
+    NewChatView()
+        .environment(ChatManager())
 }

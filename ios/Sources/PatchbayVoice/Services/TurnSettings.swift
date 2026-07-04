@@ -7,24 +7,26 @@ struct TurnSettings: Sendable {
     let ttsProvider: String?
     let speakingRate: Double
     let autoCommit: Bool
+    let autoCommitBranch: String
     let createAgentsMD: Bool
     let createClaudeMD: Bool
 
     static var current: TurnSettings {
-        let ud = UserDefaults.standard
-        let rate = ud.object(forKey: "speakingRate") as? Double ?? 1.0
+        let defaults = UserDefaults.standard
+        let rate = defaults.object(forKey: "speakingRate") as? Double ?? 1.0
         return TurnSettings(
-            model: ud.string(forKey: "selectedModelAlias") ?? "small",
-            audioResponse: ud.bool(forKey: "audioResponseEnabled"),
-            savePath: ud.string(forKey: "defaultSavePath").flatMap { $0.isEmpty ? nil : $0 },
+            model: defaults.string(forKey: "selectedModelAlias") ?? "small",
+            audioResponse: defaults.bool(forKey: "audioResponseEnabled"),
+            savePath: defaults.string(forKey: "defaultSavePath").flatMap { $0.isEmpty ? nil : $0 },
             ttsProvider: {
-                let v = ud.string(forKey: "ttsProvider") ?? "say"
-                return v == "say" ? nil : v
+                let provider = defaults.string(forKey: "ttsProvider") ?? "say"
+                return provider == "say" ? nil : provider
             }(),
             speakingRate: rate,
-            autoCommit: ud.bool(forKey: "autoCommitEnabled"),
-            createAgentsMD: ud.bool(forKey: "createAgentsMD"),
-            createClaudeMD: ud.bool(forKey: "createClaudeMD"),
+            autoCommit: defaults.bool(forKey: "autoCommitEnabled"),
+            autoCommitBranch: defaults.string(forKey: "autoCommitBranch") ?? "patchbay",
+            createAgentsMD: defaults.bool(forKey: "createAgentsMD"),
+            createClaudeMD: defaults.bool(forKey: "createClaudeMD"),
         )
     }
 }

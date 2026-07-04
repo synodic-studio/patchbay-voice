@@ -29,20 +29,20 @@ struct ContentView: View {
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
             if chatManager.currentChatID != nil {
-                Button {
-                    Task {
-                        if let id = chatManager.currentChatID {
-                            await chatManager.resetChat(id: id)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                }
+                resetButton
             }
             Button { showSettings = true } label: {
                 Image(systemName: "slider.horizontal.3")
             }
             .accessibilityIdentifier("settings-btn")
+        }
+    }
+
+    private var resetButton: some View {
+        Button {
+            Task { await chatManager.resetChat(id: chatManager.currentChatID ?? "") }
+        } label: {
+            Image(systemName: "arrow.triangle.2.circlepath")
         }
     }
 
@@ -67,4 +67,9 @@ struct ContentView: View {
                 .font(.headline)
         }
     }
+}
+
+#Preview {
+    ContentView()
+        .environment(ChatManager())
 }

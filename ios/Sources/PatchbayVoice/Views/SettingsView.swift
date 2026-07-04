@@ -10,12 +10,9 @@ struct SettingsView: View {
     @AppStorage("createAgentsMD") private var createAgentsMD = false
     @AppStorage("createClaudeMD") private var createClaudeMD = false
     @AppStorage("autoCommitEnabled") private var autoCommitEnabled = false
+    @AppStorage("autoCommitBranch") private var autoCommitBranch = "patchbay"
 
-    private var version: String {
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-        return "\(v) (\(b))"
-    }
+    @State private var serverVersionText = "—"
 
     var body: some View {
         NavigationStack {
@@ -24,17 +21,30 @@ struct SettingsView: View {
                 ModelSectionView()
                 voiceSection
                 filesSection
-                Section {
-                    Text("Version \(version)").foregroundStyle(.secondary)
-                }
+                VersionSectionView(version: appVersion, serverVersion: serverVersionText)
             }
+            .task { await loadServerVersion() }
             .navigationTitle("Settings")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            .toolbar { toolbarDone }
         }
+    }
+
+    @ToolbarContentBuilder private var toolbarDone: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Done") { dismiss() }
+        }
+    }
+
+    private var appVersion: String {
+        let versionString = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let buildString = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        return "\(versionString) (\(buildString))"
+    }
+
+    private func loadServerVersion() async {
+        guard let url = URL(string: serverURL) else { return }
+        let client = ServerClient(baseURL: url)
+        serverVersionText = await (try? client.fetchVersion()).map { "\($0.version) · \($0.source)" } ?? "—"
     }
 
     private var serverSection: some View {
@@ -53,18 +63,22 @@ struct SettingsView: View {
                 Text("macOS Say").tag("say")
                 Text("Google Cloud").tag("google")
             }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Speaking rate")
-                    Spacer()
-                    Text(String(format: "%.1f×", speakingRate))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $speakingRate, in: 0.5 ... 2.0, step: 0.1)
-            }
-            .padding(.vertical, 2)
+            speakingRateSlider
         }
+    }
+
+    private var speakingRateSlider: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Speaking rate")
+                Spacer()
+                Text(String(format: "%.1f×", speakingRate))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Slider(value: $speakingRate, in: 0.5 ... 2.0, step: 0.1)
+        }
+        .padding(.vertical, 2)
     }
 
     private var filesSection: some View {
@@ -73,10 +87,39 @@ struct SettingsView: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
             Toggle("Auto-commit to Git", isOn: $autoCommitEnabled)
+            autoCommitBranchField
             Toggle("Create AGENTS.md in save path", isOn: $createAgentsMD)
-            if createAgentsMD {
-                Toggle("Also create CLAUDE.md", isOn: $createClaudeMD)
-            }
+            claudeMDField
         }
     }
+
+    @ViewBuilder private var autoCommitBranchField: some View {
+        if autoCommitEnabled {
+            TextField("Branch name", text: $autoCommitBranch)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+        }
+    }
+
+    @ViewBuilder private var claudeMDField: some View {
+        if createAgentsMD {
+            Toggle("Also create CLAUDE.md", isOn: $createClaudeMD)
+        }
+    }
+}
+
+private struct VersionSectionView: View {
+    let version: String
+    let serverVersion: String
+
+    var body: some View {
+        Section {
+            Text("Version \(version)").foregroundStyle(.secondary)
+            Text("Server \(serverVersion)").foregroundStyle(.secondary)
+        }
+    }
+}
+
+#Preview {
+    SettingsView()
 }

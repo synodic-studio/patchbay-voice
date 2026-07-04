@@ -10,7 +10,7 @@ struct ServerClient: Sendable {
         // Server has its own 120s pi timeout — client waits generously for the response
         config.timeoutIntervalForRequest = 180
         config.timeoutIntervalForResource = 300
-        self.session = URLSession(configuration: config)
+        session = URLSession(configuration: config)
     }
 
     func fetchChats() async throws -> [Chat] {
@@ -72,6 +72,12 @@ struct ServerClient: Sendable {
         return try JSONDecoder().decode(TurnResponse.self, from: data)
     }
 
+    func fetchVersion() async throws -> ServerVersion {
+        let (data, resp) = try await session.data(from: baseURL.appending(path: "/api/version"))
+        try checkStatus(resp, data: data)
+        return try JSONDecoder().decode(ServerVersion.self, from: data)
+    }
+
     func fetchAudio(path: String) async throws -> Data {
         let (data, resp) = try await session.data(from: baseURL.appending(path: path))
         try checkStatus(resp, data: data)
@@ -92,7 +98,8 @@ struct ServerClient: Sendable {
         var body = Data()
         appendFields(to: &body, boundary: boundary, chatID: chatID, settings: settings)
         let crlf = "\r\n"
-        body += "--\(boundary)\(crlf)Content-Disposition: form-data; name=\"audio\"; filename=\"clip.m4a\"\(crlf)Content-Type: audio/m4a\(crlf)\(crlf)".utf8
+        let disposition = "Content-Disposition: form-data; name=\"audio\"; filename=\"clip.m4a\""
+        body += "--\(boundary)\(crlf)\(disposition)\(crlf)Content-Type: audio/m4a\(crlf)\(crlf)".utf8
         body += audioData
         body += "\(crlf)--\(boundary)--\(crlf)".utf8
         return body
@@ -111,10 +118,22 @@ struct ServerClient: Sendable {
         field(into: &body, boundary: boundary, name: "model", value: settings.model)
         field(into: &body, boundary: boundary, name: "audio_response", value: settings.audioResponse ? "true" : "false")
         field(into: &body, boundary: boundary, name: "chunked_audio", value: "true")
-        if let sp = settings.savePath { field(into: &body, boundary: boundary, name: "save_path", value: sp) }
-        if let tp = settings.ttsProvider { field(into: &body, boundary: boundary, name: "tts_provider", value: tp) }
-        field(into: &body, boundary: boundary, name: "speaking_rate", value: String(format: "%.2f", settings.speakingRate))
-        if settings.autoCommit { field(into: &body, boundary: boundary, name: "auto_commit", value: "true") }
+        if let savePath = settings.savePath {
+            field(into: &body, boundary: boundary, name: "save_path", value: savePath)
+        }
+        if let ttsProvider = settings.ttsProvider {
+            field(into: &body, boundary: boundary, name: "tts_provider", value: ttsProvider)
+        }
+        field(
+            into: &body,
+            boundary: boundary,
+            name: "speaking_rate",
+            value: String(format: "%.2f", settings.speakingRate),
+        )
+        if settings.autoCommit {
+            field(into: &body, boundary: boundary, name: "auto_commit", value: "true")
+            field(into: &body, boundary: boundary, name: "auto_commit_branch", value: settings.autoCommitBranch)
+        }
         if settings.createAgentsMD { field(into: &body, boundary: boundary, name: "create_agents_md", value: "true") }
         if settings.createClaudeMD { field(into: &body, boundary: boundary, name: "create_claude_md", value: "true") }
     }

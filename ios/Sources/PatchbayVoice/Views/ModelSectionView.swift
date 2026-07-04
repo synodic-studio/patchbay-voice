@@ -7,6 +7,15 @@ struct ModelSectionView: View {
     @State private var newAlias = ""
     @State private var showHidden = false
 
+    var body: some View {
+        Section("Model") {
+            visibleModels
+            addRow
+            hiddenToggle
+            hiddenModelsSection
+        }
+    }
+
     private var hidden: Set<String> { Set(hiddenRaw.split(separator: ",").map(String.init)) }
     private var custom: [LiteLLMModel] {
         customRaw.split(separator: ",").map { String($0) }
@@ -17,34 +26,13 @@ struct ModelSectionView: View {
     private var visible: [LiteLLMModel] { allModels.filter { !hidden.contains($0.id) } }
     private var hiddenModels: [LiteLLMModel] { allModels.filter { hidden.contains($0.id) } }
 
-    var body: some View {
-        Section("Model") {
-            ForEach(visible) { model in
-                modelRow(model)
-                    .swipeActions {
-                        Button("Hide", role: .destructive) { hide(model.id) }
-                    }
-            }
-            addRow
-            if !hiddenModels.isEmpty {
-                Button(showHidden ? "Hide hidden" : "Show hidden (\(hiddenModels.count))") {
-                    showHidden.toggle()
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            if showHidden {
-                ForEach(hiddenModels) { model in
-                    Button { unhide(model.id) } label: {
-                        Label(model.name, systemImage: "eye")
-                    }
-                    .foregroundStyle(.primary)
-                }
-            }
+    private var visibleModels: some View {
+        ForEach(visible) { model in
+            modelRow(model)
+                .hideSwipe(for: model.id, onHide: hide)
         }
     }
 
-    @ViewBuilder
     private func modelRow(_ model: LiteLLMModel) -> some View {
         Button {
             selectedAlias = model.id
@@ -53,11 +41,16 @@ struct ModelSectionView: View {
                 Text(model.name)
                     .foregroundStyle(.primary)
                 Spacer()
-                if selectedAlias == model.id {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(Color.accentColor)
-                }
+                selectedCheckmark(modelID: model.id)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func selectedCheckmark(modelID: String) -> some View {
+        if selectedAlias == modelID {
+            Image(systemName: "checkmark")
+                .foregroundStyle(Color.accentColor)
         }
     }
 
@@ -68,6 +61,27 @@ struct ModelSectionView: View {
                 .textInputAutocapitalization(.never)
             Button("Add") { addCustom() }
                 .disabled(newAlias.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+    }
+
+    @ViewBuilder private var hiddenToggle: some View {
+        if !hiddenModels.isEmpty {
+            Button(showHidden ? "Hide hidden" : "Show hidden (\(hiddenModels.count))") {
+                showHidden.toggle()
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var hiddenModelsSection: some View {
+        if showHidden {
+            ForEach(hiddenModels) { model in
+                Button { unhide(model.id) } label: {
+                    Label(model.name, systemImage: "eye")
+                }
+                .foregroundStyle(.primary)
+            }
         }
     }
 
@@ -92,5 +106,21 @@ struct ModelSectionView: View {
         customRaw = parts.joined(separator: ",")
         selectedAlias = alias
         newAlias = ""
+    }
+}
+
+// MARK: - Swipe helper
+
+fileprivate extension View {
+    func hideSwipe(for modelID: String, onHide: @escaping (String) -> Void) -> some View {
+        swipeActions(edge: .trailing) {
+            Button("Hide", role: .destructive) { onHide(modelID) }
+        }
+    }
+}
+
+#Preview {
+    Form {
+        ModelSectionView()
     }
 }

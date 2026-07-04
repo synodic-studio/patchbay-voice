@@ -16,8 +16,8 @@ struct TurnResponse: Decodable, Sendable {
     }
 
     var allAudioPaths: [String] {
-        if let urls = audioURLs, !urls.isEmpty { return urls }
-        if let url = audioURL { return [url] }
+        if let audioURLs, !audioURLs.isEmpty { return audioURLs }
+        if let audioURL { return [audioURL] }
         return []
     }
 }
