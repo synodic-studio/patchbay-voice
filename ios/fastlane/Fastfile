@@ -1,8 +1,12 @@
 default_platform(:ios)
 
-ASC_KEY_ID    = "REDACTED-ASC-KEY-ID"
-ASC_ISSUER_ID = "REDACTED-ASC-ISSUER-ID"
-ASC_KEY_PATH  = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_REDACTED-ASC-KEY-ID.p8")
+ASC_KEY_ID    = ENV["ASC_KEY_ID"] || `pass show asc-key-id 2>/dev/null`.strip
+ASC_ISSUER_ID = ENV["ASC_ISSUER_ID"] || `pass show asc-issuer-id 2>/dev/null`.strip
+ASC_KEY_PATH  = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{ASC_KEY_ID}.p8")
+
+if ASC_KEY_ID.empty? || ASC_ISSUER_ID.empty?
+  UI.user_error!("ASC credentials not set. Run: pass insert asc-key-id  (or set ASC_KEY_ID env var)")
+end
 
 platform :ios do
   desc "Upload the already-built IPA to TestFlight (skips build)"
