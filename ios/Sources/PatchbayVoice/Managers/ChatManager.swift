@@ -14,7 +14,8 @@ final class ChatManager {
 
     var client: ServerClient {
         let raw = UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8800"
-        return ServerClient(baseURL: URL(string: raw)!)
+        let token = UserDefaults.standard.string(forKey: "serverToken") ?? ""
+        return ServerClient(baseURL: URL(string: raw)!, token: token)
     }
 
     func load() async {

@@ -2,10 +2,12 @@ import Foundation
 
 struct ServerClient: Sendable {
     let baseURL: URL
+    let token: String
     private let session: URLSession
 
-    init(baseURL: URL) {
+    init(baseURL: URL, token: String = "") {
         self.baseURL = baseURL
+        self.token = token
         let config = URLSessionConfiguration.default
         // Server has its own 120s pi timeout — client waits generously for the response
         config.timeoutIntervalForRequest = 180
@@ -14,14 +16,13 @@ struct ServerClient: Sendable {
     }
 
     func fetchChats() async throws -> [Chat] {
-        let (data, resp) = try await session.data(from: baseURL.appending(path: "/api/chats"))
+        let (data, resp) = try await session.data(for: request(path: "/api/chats"))
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(ChatListResponse.self, from: data).chats
     }
 
     func createChat(projectDir: String) async throws -> Chat {
-        var req = URLRequest(url: baseURL.appending(path: "/api/chats"))
-        req.httpMethod = "POST"
+        var req = request(path: "/api/chats", method: "POST")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(["project_dir": projectDir])
         let (data, resp) = try await session.data(for: req)
@@ -30,30 +31,25 @@ struct ServerClient: Sendable {
     }
 
     func deleteChat(id: String) async throws {
-        var req = URLRequest(url: baseURL.appending(path: "/api/chats/\(id)"))
-        req.httpMethod = "DELETE"
-        let (data, resp) = try await session.data(for: req)
+        let (data, resp) = try await session.data(for: request(path: "/api/chats/\(id)", method: "DELETE"))
         try checkStatus(resp, data: data)
     }
 
     func resetChat(id: String) async throws -> Chat {
-        var req = URLRequest(url: baseURL.appending(path: "/api/chats/\(id)/reset"))
-        req.httpMethod = "POST"
-        let (data, resp) = try await session.data(for: req)
+        let (data, resp) = try await session.data(for: request(path: "/api/chats/\(id)/reset", method: "POST"))
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(Chat.self, from: data)
     }
 
     func fetchProjects() async throws -> [String] {
-        let (data, resp) = try await session.data(from: baseURL.appending(path: "/api/projects"))
+        let (data, resp) = try await session.data(for: request(path: "/api/projects"))
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(ProjectListResponse.self, from: data).projects
     }
 
     func sendTurn(chatID: String, audioData: Data, settings: TurnSettings) async throws -> TurnResponse {
         let boundary = UUID().uuidString
-        var req = URLRequest(url: baseURL.appending(path: "/api/talk"))
-        req.httpMethod = "POST"
+        var req = request(path: "/api/talk", method: "POST")
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.httpBody = audioMultipartBody(boundary: boundary, chatID: chatID, audioData: audioData, settings: settings)
         let (data, resp) = try await session.data(for: req)
@@ -63,8 +59,7 @@ struct ServerClient: Sendable {
 
     func sendTextTurn(chatID: String, text: String, settings: TurnSettings) async throws -> TurnResponse {
         let boundary = UUID().uuidString
-        var req = URLRequest(url: baseURL.appending(path: "/api/talk"))
-        req.httpMethod = "POST"
+        var req = request(path: "/api/talk", method: "POST")
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.httpBody = textMultipartBody(boundary: boundary, chatID: chatID, text: text, settings: settings)
         let (data, resp) = try await session.data(for: req)
@@ -73,18 +68,27 @@ struct ServerClient: Sendable {
     }
 
     func fetchVersion() async throws -> ServerVersion {
-        let (data, resp) = try await session.data(from: baseURL.appending(path: "/api/version"))
+        let (data, resp) = try await session.data(for: request(path: "/api/version"))
         try checkStatus(resp, data: data)
         return try JSONDecoder().decode(ServerVersion.self, from: data)
     }
 
     func fetchAudio(path: String) async throws -> Data {
-        let (data, resp) = try await session.data(from: baseURL.appending(path: path))
+        let (data, resp) = try await session.data(for: request(path: path))
         try checkStatus(resp, data: data)
         return data
     }
 
     // MARK: - Private
+
+    private func request(path: String, method: String = "GET") -> URLRequest {
+        var req = URLRequest(url: baseURL.appending(path: path))
+        req.httpMethod = method
+        if !token.isEmpty {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return req
+    }
 
     private func checkStatus(_ response: URLResponse, data: Data) throws {
         guard let http = response as? HTTPURLResponse, http.statusCode != 200 else { return }

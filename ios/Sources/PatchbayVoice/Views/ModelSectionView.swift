@@ -111,7 +111,7 @@ struct ModelSectionView: View {
 
 // MARK: - Swipe helper
 
-fileprivate extension View {
+private extension View {
     func hideSwipe(for modelID: String, onHide: @escaping (String) -> Void) -> some View {
         swipeActions(edge: .trailing) {
             Button("Hide", role: .destructive) { onHide(modelID) }

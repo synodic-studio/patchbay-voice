@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("serverURL") private var serverURL = "http://localhost:8800"
+    @AppStorage("serverToken") private var serverToken = ""
     @AppStorage("audioResponseEnabled") private var audioResponseEnabled = true
     @AppStorage("ttsProvider") private var ttsProvider = "say"
     @AppStorage("speakingRate") private var speakingRate = 1.0
@@ -43,7 +44,7 @@ struct SettingsView: View {
 
     private func loadServerVersion() async {
         guard let url = URL(string: serverURL) else { return }
-        let client = ServerClient(baseURL: url)
+        let client = ServerClient(baseURL: url, token: serverToken)
         serverVersionText = await (try? client.fetchVersion()).map { "\($0.version) · \($0.source)" } ?? "—"
     }
 
@@ -51,6 +52,9 @@ struct SettingsView: View {
         Section("Server") {
             TextField("URL", text: $serverURL)
                 .keyboardType(.URL)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            SecureField("Token (not required)", text: $serverToken)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
         }

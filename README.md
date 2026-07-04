@@ -54,6 +54,7 @@ Runs on port 8800 by default. Configure with environment variables:
 |---|---|---|
 | `VOICE_HOST` | `127.0.0.1` | Bind address |
 | `VOICE_PORT` | `8800` | Port |
+| `VOICE_AUTH_TOKEN` | *(empty — auth off)* | Optional bearer token required on `/api/*` when set |
 | `PI_BIN` | `pi` | Path to pi binary |
 | `PI_PROVIDER` | `litellm` | pi model provider |
 | `PI_MODEL` | `small` | pi model alias |
@@ -73,10 +74,10 @@ launchctl load ~/Library/LaunchAgents/com.synodic.patchbay-voice-server.plist
 
 ## Install via Homebrew
 
-The server is also available via [synodic-studio/homebrew-synodic](https://github.com/synodic-studio/homebrew-synodic) (private repo, SSH):
+The server is also available via [synodic-studio/homebrew-synodic](https://github.com/synodic-studio/homebrew-synodic):
 
 ```bash
-brew tap synodic-studio/synodic git@github.com:synodic-studio/homebrew-synodic.git
+brew tap synodic-studio/synodic
 brew install --HEAD synodic-studio/synodic/patchbay-voice-server
 brew services start synodic-studio/synodic/patchbay-voice-server
 ```
@@ -92,6 +93,18 @@ launchctl setenv VOICE_HOST 0.0.0.0 && \
 (Plain `VOICE_HOST=… brew services start` does not work — shell environment variables don't propagate into launchd-managed services.) Run `patchbay-voice urls` to print connection URLs.
 
 > **Pick one approach.** The Homebrew formula and the repo-checkout LaunchAgent plist (above) manage the same service. Choose one — do not load both.
+
+## Authentication (optional)
+
+Auth is off by default — on a loopback or Tailscale-only bind the network is the boundary. If you expose the server more widely, set a shared token:
+
+```bash
+VOICE_AUTH_TOKEN=<token> uv run uvicorn app:app        # repo checkout
+launchctl setenv VOICE_AUTH_TOKEN <token> && \
+  brew services restart patchbay-voice-server           # brew service
+```
+
+When set, every `/api/*` request must send `Authorization: Bearer <token>` or it gets a 401. Paste the same token into the iOS app's Settings (Server → Token) and the web client's Settings (Server → Token). `GET /` and `/audio/*` (unguessable UUID filenames) stay open so the web page and audio playback work without headers.
 
 ## The pi Extension
 

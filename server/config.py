@@ -17,6 +17,10 @@ def _pass_show(name: str) -> str:
 HOST = environ.get("VOICE_HOST", "127.0.0.1")
 PORT = int(environ.get("VOICE_PORT", "8800"))
 
+# Optional shared secret. When set, all /api/* requests must carry
+# "Authorization: Bearer <token>". Empty (the default) disables auth.
+AUTH_TOKEN = environ.get("VOICE_AUTH_TOKEN", "").strip()
+
 WHISPER_MODEL = environ.get("WHISPER_MODEL", "base.en")
 WHISPER_DEVICE = environ.get("WHISPER_DEVICE", "auto")
 WHISPER_COMPUTE = environ.get("WHISPER_COMPUTE", "int8")

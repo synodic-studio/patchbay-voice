@@ -36,13 +36,15 @@ extension TalkView {
     }
 
     @ViewBuilder var emptyState: some View {
-        if viewModel.turns.isEmpty && !viewModel.isProcessing {
-            Text(chatManager.currentChat == nil
-                 ? "Open Sessions to get started"
-                 : "Hold to talk or type below")
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, 60)
+        if viewModel.turns.isEmpty, !viewModel.isProcessing {
+            Text(
+                chatManager.currentChat == nil
+                    ? "Open Sessions to get started"
+                    : "Hold to talk or type below",
+            )
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 60)
         }
     }
 
@@ -62,7 +64,8 @@ extension TalkView {
         .padding(.vertical, 4)
     }
 
-    @ViewBuilder func transcriptBubble(_ text: String) -> some View {
+    @ViewBuilder
+    func transcriptBubble(_ text: String) -> some View {
         if !text.isEmpty {
             HStack {
                 Spacer(minLength: 64)

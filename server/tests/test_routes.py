@@ -668,3 +668,30 @@ class TestTalkSession:
         call = mock_pi.await_args
         assert call is not None
         assert call.kwargs.get("model") == "gpt-4o"
+
+
+# ── bearer-token auth ─────────────────────────────────────────────────────────
+
+
+class TestBearerAuth:
+    def test_api_requires_token_when_configured(self, client):
+        import config
+
+        with patch.object(config, "AUTH_TOKEN", "sekrit"):
+            assert client.get("/api/chats").status_code == 401
+            assert client.get("/api/chats", headers={"Authorization": "Bearer wrong"}).status_code == 401
+            assert client.get("/api/chats", headers={"Authorization": "Bearer sekrit"}).status_code == 200
+
+    def test_web_page_and_audio_stay_open(self, client):
+        import config
+
+        with patch.object(config, "AUTH_TOKEN", "sekrit"):
+            assert client.get("/").status_code == 200
+            # /audio 404s for a missing file but must not 401
+            assert client.get("/audio/nonexistent.mp3").status_code != 401
+
+    def test_no_token_configured_means_no_auth(self, client):
+        import config
+
+        with patch.object(config, "AUTH_TOKEN", ""):
+            assert client.get("/api/chats").status_code == 200

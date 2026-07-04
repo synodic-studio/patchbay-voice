@@ -3,9 +3,11 @@ import SwiftUI
 struct TalkView: View {
     @Environment(ChatManager.self) var chatManager
     @AppStorage("audioResponseEnabled") var audioResponseEnabled = true
+    // Not private: TalkView+Scroll.swift extends this view from another file.
+    // swiftformat:disable:next privateStateVariables
     @State var viewModel = TalkViewModel()
-    @State var textInput = ""
-    @State var showTextInput = false
+    @State private var textInput = ""
+    @State private var showTextInput = false
 
     var body: some View {
         VStack(spacing: 0) {
