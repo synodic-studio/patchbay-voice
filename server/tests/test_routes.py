@@ -2,7 +2,66 @@
 
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+
+
+# ── /api/version ──────────────────────────────────────────────────────────────
+
+
+class TestVersionEndpoint:
+    def test_endpoint_returns_expected_keys(self, client):
+        r = client.get("/api/version")
+        assert r.status_code == 200
+        body = r.json()
+        assert "version" in body
+        assert "source" in body
+        assert "python" in body
+        assert "pid" in body
+        assert body["source"] in ("homebrew", "checkout", "unknown")
+
+    def test_build_info_branch(self, monkeypatch):
+        """When BUILD_INFO exists next to app.py, source=homebrew."""
+        import routes.misc as misc_mod
+
+        def mock_is_file(path_self):
+            if path_self.name == "BUILD_INFO":
+                return True
+            return Path.__dict__["is_file"]
+
+        monkeypatch.setattr(Path, "is_file", mock_is_file)
+        monkeypatch.setattr(Path, "read_text", lambda _: "brew-HEAD-abc1234def56\n")
+
+        v, s = misc_mod._compute_version()
+        assert s == "homebrew"
+        assert v == "brew-HEAD-abc1234def56"
+
+    def test_git_branch(self, monkeypatch):
+        """No BUILD_INFO, git works → source=checkout."""
+        import routes.misc as misc_mod
+
+        monkeypatch.setattr(Path, "is_file", lambda _: False)
+
+        with patch("routes.misc.subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = "abc1234\n"
+            v, s = misc_mod._compute_version()
+
+        assert s == "checkout"
+        assert v == "git-abc1234"
+
+    def test_fallback(self, monkeypatch):
+        """No BUILD_INFO, git fails → unknown/unknown."""
+        import routes.misc as misc_mod
+
+        monkeypatch.setattr(Path, "is_file", lambda _: False)
+
+        with patch("routes.misc.subprocess.run", side_effect=FileNotFoundError()):
+            v, s = misc_mod._compute_version()
+
+        assert v == "unknown"
+        assert s == "unknown"
 
 
 # ── /api/chats ────────────────────────────────────────────────────────────────
@@ -319,25 +378,88 @@ class TestTalkSavePath:
 
 
 class TestTalkAutoCommit:
-    def test_auto_commit_calls_git(self, client, chat_id):
-        with (
-            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="ok"),
-            patch("routes.talk.subprocess.run") as mock_run,
-        ):
-            mock_run.return_value = MagicMock(returncode=1)  # diff has changes
+    @staticmethod
+    def _init_repo(proj: Path) -> None:
+        def git(*args):
+            subprocess.run(["git", *args], cwd=str(proj), capture_output=True, check=True)
+
+        git("init", "-b", "develop")
+        git("config", "user.email", "test@example.com")
+        git("config", "user.name", "Test")
+        (proj / "README.md").write_text("hello\n")
+        git("add", "README.md")
+        git("commit", "-m", "init")
+
+    @staticmethod
+    def _git_out(proj: Path, *args) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=str(proj), capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    def test_auto_commit_lands_on_named_branch_without_touching_working_state(self, client, chat_id, tmp_dev):
+        proj = tmp_dev / "proj"
+        self._init_repo(proj)
+        # Pre-stage an UNRELATED file in the real index — it must not leak
+        (proj / "unrelated.txt").write_text("staged but not for voice\n")
+        subprocess.run(["git", "add", "unrelated.txt"], cwd=str(proj), capture_output=True, check=True)
+
+        def fake_pi(*a, **kw):
+            (proj / "docs" / "patchbay").mkdir(parents=True, exist_ok=True)
+            (proj / "docs" / "patchbay" / "note.md").write_text("a note\n")
+            return "ok"
+
+        with patch("routes.talk.run_pi", new_callable=AsyncMock, side_effect=fake_pi):
             r = client.post(
                 "/api/talk",
-                data={"chat_id": chat_id, "text": "hi", "audio_response": "false", "auto_commit": "true"},
+                data={
+                    "chat_id": chat_id,
+                    "text": "hi",
+                    "audio_response": "false",
+                    "auto_commit": "true",
+                    "auto_commit_branch": "patchbay",
+                },
             )
         assert r.status_code == 200
-        calls = [str(c) for c in mock_run.call_args_list]
-        assert any("git" in c and "add" in c for c in calls)
-        # Verify 'git commit' includes '--' pathspec followed by the save path
-        commit_calls = [c for c in mock_run.call_args_list if "commit" in str(c)]
-        assert len(commit_calls) > 0, "Expected at least one git commit call"
-        commit_args = commit_calls[0][0][0]  # cmd list from first positional arg
-        assert "--" in commit_args, f"Missing '--' pathspec in commit args: {commit_args}"
-        assert "docs/patchbay/" in commit_args, f"Missing save path in commit args: {commit_args}"
+
+        # Commit landed on the patchbay branch with only the note
+        tree_files = self._git_out(proj, "ls-tree", "-r", "--name-only", "patchbay")
+        assert "docs/patchbay/note.md" in tree_files
+        assert "unrelated.txt" not in tree_files
+        assert self._git_out(proj, "log", "-1", "--format=%s", "patchbay") == "voice: save notes"
+        # Working branch and real index untouched
+        assert self._git_out(proj, "branch", "--show-current") == "develop"
+        staged = self._git_out(proj, "diff", "--cached", "--name-only")
+        assert staged == "unrelated.txt"
+
+    def test_auto_commit_advances_existing_branch(self, client, chat_id, tmp_dev):
+        proj = tmp_dev / "proj"
+        self._init_repo(proj)
+
+        def fake_pi_factory(content):
+            def fake_pi(*a, **kw):
+                (proj / "docs" / "patchbay").mkdir(parents=True, exist_ok=True)
+                (proj / "docs" / "patchbay" / "note.md").write_text(content)
+                return "ok"
+
+            return fake_pi
+
+        data = {"chat_id": chat_id, "text": "hi", "audio_response": "false", "auto_commit": "true"}
+        with patch("routes.talk.run_pi", new_callable=AsyncMock, side_effect=fake_pi_factory("one\n")):
+            client.post("/api/talk", data=data)
+        with patch("routes.talk.run_pi", new_callable=AsyncMock, side_effect=fake_pi_factory("two\n")):
+            client.post("/api/talk", data=data)
+        count = self._git_out(proj, "rev-list", "--count", "develop..patchbay")
+        assert count == "2"
+
+    def test_auto_commit_skips_when_nothing_new(self, client, chat_id, tmp_dev):
+        proj = tmp_dev / "proj"
+        self._init_repo(proj)
+        data = {"chat_id": chat_id, "text": "hi", "audio_response": "false", "auto_commit": "true"}
+        with patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="ok"):
+            client.post("/api/talk", data=data)
+        # save_path dir was created but is empty → no commit, branch not created
+        branches = self._git_out(proj, "branch", "--list", "patchbay")
+        assert branches == ""
 
     def test_auto_commit_false_skips_git(self, client, chat_id):
         with (

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -35,6 +37,7 @@ async def talk(
     model: str = Form(default=""),
     save_path: str = Form(default="docs/patchbay/"),
     auto_commit: str = Form(default="false"),
+    auto_commit_branch: str = Form(default="patchbay"),
     create_agents_md: str = Form(default="false"),
     create_claude_md: str = Form(default="false"),
 ):
@@ -92,7 +95,7 @@ async def talk(
         t_llm = time.time() - t1
 
         if want_commit:
-            _git_commit(project_dir, clean_save)
+            _git_commit(project_dir, clean_save, branch=auto_commit_branch)
 
         # TTS
         audio_urls: list[str] = []
@@ -137,21 +140,54 @@ def _ensure_file(path: Path, content: str) -> None:
         path.write_text(content)
 
 
-def _git_commit(project_dir: Path, save_path: str) -> None:
-    try:
-        subprocess.run(["git", "add", "--", save_path], cwd=str(project_dir), capture_output=True, timeout=10)
-        diff = subprocess.run(
-            ["git", "diff", "--cached", "--quiet"],
+def _git_commit(project_dir: Path, save_path: str, branch: str = "patchbay") -> None:
+    """Commit the save path to *branch* without switching to it.
+
+    Builds the commit in a temporary index (GIT_INDEX_FILE) seeded from the
+    branch tip, so the user's real index, working branch, and staged changes
+    are never touched — and never leak into the auto-commit.
+    """
+
+    def _git(*args: str, env: dict | None = None) -> str:
+        result = subprocess.run(
+            ["git", *args],
             cwd=str(project_dir),
             capture_output=True,
-            timeout=5,
+            text=True,
+            timeout=15,
+            env={**os.environ, **(env or {})},
         )
-        if diff.returncode != 0:
-            subprocess.run(
-                ["git", "commit", "-m", "voice: save notes", "--", save_path],
-                cwd=str(project_dir),
-                capture_output=True,
-                timeout=15,
-            )
+        if result.returncode != 0:
+            raise RuntimeError(f"git {args[0]}: {result.stderr.strip() or result.returncode}")
+        return result.stdout.strip()
+
+    tmp_index = None
+    try:
+        # Parent: tip of target branch, or HEAD if the branch doesn't exist yet
+        try:
+            parent = _git("rev-parse", "--verify", f"refs/heads/{branch}")
+            expected_old = parent  # guard against concurrent ref moves
+        except RuntimeError:
+            parent = _git("rev-parse", "HEAD")
+            expected_old = ""  # ref must not exist yet
+
+        fd, tmp_index = tempfile.mkstemp(prefix="voice-index-")
+        os.close(fd)
+        os.unlink(tmp_index)  # git wants to create the index file itself
+        env = {"GIT_INDEX_FILE": tmp_index}
+
+        # Seed the isolated index from the parent, stage only the save path
+        _git("read-tree", parent, env=env)
+        _git("add", "--", save_path, env=env)
+        tree = _git("write-tree", env=env)
+
+        if tree == _git("rev-parse", f"{parent}^{{tree}}"):
+            return  # nothing new under save_path
+
+        commit = _git("commit-tree", tree, "-p", parent, "-m", "voice: save notes", env=env)
+        _git("update-ref", f"refs/heads/{branch}", commit, expected_old)
     except Exception as exc:
-        print(f"[git] commit failed: {exc}", file=sys.stderr)
+        print(f"[git] commit to {branch} failed: {exc}", file=sys.stderr)
+    finally:
+        if tmp_index:
+            Path(tmp_index).unlink(missing_ok=True)
