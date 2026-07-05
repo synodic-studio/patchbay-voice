@@ -106,6 +106,18 @@ launchctl setenv VOICE_AUTH_TOKEN <token> && \
 
 When set, every `/api/*` request must send `Authorization: Bearer <token>` or it gets a 401. Paste the same token into the iOS app's Settings (Server → Token) and the web client's Settings (Server → Token). `GET /` and `/audio/*` (unguessable UUID filenames) stay open so the web page and audio playback work without headers.
 
+## Local LLM (optional, no cloud credentials)
+
+By default pi talks to a cloud model (you provide the key). If you'd rather run with **no cloud credentials at all**, an opt-in helper points pi at a local Gemma model served by [Ollama](https://ollama.com):
+
+```bash
+scripts/enable-local-llm.sh              # default: gemma4:e2b
+scripts/enable-local-llm.sh gemma4:e4b   # a larger model
+scripts/enable-local-llm.sh --disable    # revert to the cloud provider
+```
+
+It installs Ollama if needed, pulls the model, registers an `ollama` provider in pi's config, and restarts the server with `PI_PROVIDER=ollama`. **Gemma 4 supports tool-calling, so `write_file` works fully offline** (Gemma 3 does not — it is conversational only). This is opt-in and never part of the default install: `gemma4:e2b` is ~7.2GB, and a small local model is a weaker coding agent than a frontier cloud model. Combined with local faster-whisper and the `say`/espeak TTS engines, this makes the whole stack runnable with zero external accounts.
+
 ## The pi Extension
 
 The file `pi/tools.ts` is a pi extension that registers a single `write_file` tool. It constrains all file saves to a configured directory (`VOICE_SAVE_PATH` env var, defaulting to `docs/patchbay/` inside the session's project dir). This is the only tool pi has access to — no shell, no git, no arbitrary writes.
