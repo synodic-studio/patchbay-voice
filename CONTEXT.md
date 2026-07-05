@@ -4,6 +4,10 @@ A voice interface to the `pi` coding agent — speak to it from a phone or brows
 
 ## Language
 
+**Chat**:
+The single, ongoing, cumulative conversation for one project directory — at most one per project, for as long as that project exists in the app (a deliberate choice, see docs/adr/0004). Holds all of that project's turns and, separately, a `pi_session_id` — pi's own internal session, which can be reset independently without losing the chat's turn history.
+_Avoid_: session (ambiguous with pi's own session — say "chat" for our object, "pi session" for pi's)
+
 **Turn**:
 One exchange in a chat: a user's transcript paired with the assistant's reply. Audio is a best-effort rendering of the reply, never a requirement for the turn to exist or be delivered — a turn with a reply and no audio is still a complete, successful turn.
 _Avoid_: message, exchange, request
