@@ -27,3 +27,7 @@ _Avoid_: pending message, backlog
 **Steer** _(not yet implemented — considered and deferred, see docs/adr/0002)_:
 Injecting a new message into a chat's in-progress turn so the agent picks it up as soon as its current tool call finishes and before its next LLM call — without aborting the turn in progress. Borrowed directly from `pi`'s own RPC-mode vocabulary (`streamingBehavior: "steer"`). Distinct from `abort` (forceful interrupt) and from queueing (waits for the turn to fully finish).
 _Avoid_: interrupt, inject (use only when distinguishing from steer's non-interrupting semantics)
+
+**Note**:
+A file pi writes via the `write_file` tool to record something for later — notes, plans, anything the user asks it to save. Lives under a project's configured save path (`docs/patchbay/` by default), separate from the conversation itself: a Note is content pi produces as a side effect of a turn, not the turn's reply.
+_Avoid_: memo, document, file (too generic — use Note for anything written via write_file specifically)
