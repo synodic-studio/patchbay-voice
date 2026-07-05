@@ -40,6 +40,7 @@ PI_MODEL = environ.get("PI_MODEL", "small")
 
 DEVELOPER_DIR = Path(environ.get("DEVELOPER_DIR", "~/Developer")).expanduser()
 CHATS_FILE = Path(environ.get("CHATS_FILE", "~/.voice-demo-chats.json").strip()).expanduser()
+TURNS_FILE = Path(environ.get("TURNS_FILE", "~/.voice-demo-turns.json").strip()).expanduser()
 
 TTS_VOICE = environ.get("TTS_VOICE", "Samantha")
 
@@ -65,6 +66,7 @@ TTS_SPEAKING_RATE = float(environ.get("TTS_SPEAKING_RATE", "1.0"))
 
 HERE = Path(__file__).resolve().parent
 STATIC_DIR = HERE.parent / "web"
+ASSETS_DIR = HERE / "assets"  # server-internal assets (e.g. the TTS-unavailable clip)
 EXTENSION_PATH = HERE.parent / "pi" / "tools.ts"
 
 AUDIO_DIR = Path(tempfile.gettempdir()) / "voice-demo-audio"

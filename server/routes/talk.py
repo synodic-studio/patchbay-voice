@@ -14,14 +14,20 @@ from fastapi.responses import JSONResponse
 
 import asr as asr_mod
 import tts as tts_mod
-from chats import _chats, save_chats
+from chats import _chats, add_turn, save_chats
 from config import AUDIO_DIR, DEVELOPER_DIR
 from pi_runner import run_pi
 
 router = APIRouter()
 
-# Per-chat lock so overlapping turns on the same chat serialize.
-# Turns on different chats still run concurrently.
+# Per-chat FIFO lock so overlapping turns on the same chat serialize in
+# strict submission order.  Turns on different chats run fully concurrently.
+#
+# CPython's asyncio.Lock uses collections.deque internally: acquire() appends
+# a waiter-future to the right and _wake_up_first() peeks the oldest waiter
+# from the left.  This is documented as "fair scheduling" in the CPython source
+# (Lib/asyncio/locks.py, comment: "calls will unblock tasks in FIFO order").
+# No additional ordering mechanism is needed — see ADR 0002.
 _talk_locks: dict[str, asyncio.Lock] = {}
 
 
@@ -87,30 +93,40 @@ async def talk(
             raise HTTPException(400, "Provide audio or text")
 
         if not transcript:
-            return JSONResponse({"transcript": "", "reply": "No speech detected.", "audio_url": None, "audio_urls": []})
+            return JSONResponse({"transcript": "", "reply": "No speech detected.", "audio_url": None, "audio_urls": [], "audio_degraded": False})
 
         # Run pi
         t1 = time.time()
         reply = await run_pi(transcript, chat, save_path=clean_save, model=model)
         t_llm = time.time() - t1
 
+        # Save turn immediately so it persists even if TTS fails
+        if reply and reply != "(no response)":
+            add_turn(chat.id, transcript, reply)
+
         if want_commit:
             _git_commit(project_dir, clean_save, branch=auto_commit_branch)
 
-        # TTS
+        # TTS — synthesize never raises for provider failures, so the
+        # try/except here is only a safety net for truly unexpected bugs.
         audio_urls: list[str] = []
+        audio_degraded = False
         t2 = time.time()
         if want_audio and reply:
             try:
                 if want_chunked:
-                    paths = await tts_mod.synthesize_chunked(reply, provider=tts_provider, speaking_rate=speaking_rate)
+                    paths, audio_degraded = await tts_mod.synthesize_chunked(
+                        reply, provider=tts_provider, speaking_rate=speaking_rate
+                    )
                 else:
-                    paths = [await tts_mod.synthesize(reply, provider=tts_provider, speaking_rate=speaking_rate)]
+                    path, audio_degraded = await tts_mod.synthesize(
+                        reply, provider=tts_provider, speaking_rate=speaking_rate
+                    )
+                    paths = [path]
                 audio_urls = [f"/audio/{p.name}" for p in paths]
-            except HTTPException:
-                raise
             except Exception as exc:
                 print(f"[tts] error: {exc}", file=sys.stderr)
+                audio_degraded = True
         t_tts = time.time() - t2
 
         chat.last_active = time.time()
@@ -127,6 +143,7 @@ async def talk(
                 "reply": reply,
                 "audio_url": audio_urls[0] if audio_urls else None,
                 "audio_urls": audio_urls,
+                "audio_degraded": audio_degraded,
             }
         )
 

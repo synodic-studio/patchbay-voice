@@ -191,6 +191,7 @@ class TestTalkResponseShape:
         assert "reply" in body
         assert "audio_url" in body  # may be None
         assert "audio_urls" in body  # may be []
+        assert "audio_degraded" in body  # must be present, defaults to false
 
     def test_no_audio_response_returns_empty_arrays(self, client, chat_id):
         with patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="Got it."):
@@ -225,7 +226,7 @@ class TestTalkAudio:
         fake_audio.write_bytes(b"audio")
         with (
             patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="Here you go."),
-            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=fake_audio),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(fake_audio, False)),
         ):
             r = client.post(
                 "/api/talk",
@@ -237,6 +238,7 @@ class TestTalkAudio:
         assert len(body["audio_urls"]) == 1
         assert body["audio_url"] == body["audio_urls"][0]
         assert body["audio_url"].startswith("/audio/")
+        assert body["audio_degraded"] is False
 
     def test_chunked_audio_returns_multiple_urls(self, client, chat_id, tmp_path):
         chunks = [tmp_path / f"c{i}.m4a" for i in range(3)]
@@ -244,7 +246,7 @@ class TestTalkAudio:
             c.write_bytes(b"chunk")
         with (
             patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="One. Two. Three."),
-            patch("routes.talk.tts_mod.synthesize_chunked", new_callable=AsyncMock, return_value=chunks),
+            patch("routes.talk.tts_mod.synthesize_chunked", new_callable=AsyncMock, return_value=(chunks, False)),
         ):
             r = client.post(
                 "/api/talk",
@@ -254,6 +256,7 @@ class TestTalkAudio:
         body = r.json()
         assert len(body["audio_urls"]) == 3
         assert all(u.startswith("/audio/") for u in body["audio_urls"])
+        assert body["audio_degraded"] is False
 
     def test_tts_error_does_not_crash_server(self, client, chat_id):
         """TTS failure should not propagate as 500 — reply is still returned."""
@@ -269,6 +272,7 @@ class TestTalkAudio:
         body = r.json()
         assert body["reply"] == "reply"
         assert body["audio_urls"] == []
+        assert body["audio_degraded"] is True
 
     def test_audio_upload_calls_transcription(self, client, chat_id):
         fake_audio = b"\x00" * 64
@@ -295,6 +299,41 @@ class TestTalkAudio:
         body = r.json()
         assert body["transcript"] == ""
         assert "No speech" in body["reply"]
+
+    def test_audio_degraded_false_on_normal_success(self, client, chat_id, tmp_path):
+        """Normal successful turn includes audio_degraded: false."""
+        fake_audio = tmp_path / "out.m4a"
+        fake_audio.write_bytes(b"audio")
+        with (
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="Hello!"),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(fake_audio, False)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "hi", "audio_response": "true", "tts_provider": "say"},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["audio_degraded"] is False
+        assert len(body["audio_urls"]) == 1
+
+    def test_audio_degraded_true_when_both_providers_fail(self, client, chat_id, tmp_path):
+        """Both providers fail → static clip used, audio_degraded: true."""
+        import tts as tts_mod
+
+        static_path = tts_mod._STATIC_FALLBACK
+        with (
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="Hello!"),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(static_path, True)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "hi", "audio_response": "true", "tts_provider": "say"},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["audio_degraded"] is True
+        assert len(body["audio_urls"]) == 1
 
 
 # ── /api/talk — save path & file creation ────────────────────────────────────
@@ -639,6 +678,76 @@ class TestTalkConcurrency:
                     r2 = await t2
                     assert r1.status_code == 200
                     assert r2.status_code == 200
+
+        asyncio.run(_run())
+
+
+# ── /api/talk — FIFO ordering with unique payloads ───────────────────────────
+
+
+class TestTalkFifoOrder:
+    """Every submission accepted; processed in strict submission order per chat."""
+
+    def test_fires_N_concurrent_requests_processed_in_order(self, client, chat_id, tmp_dev):
+        """Fire 5 overlapping requests with unique transcripts; verify order preserved."""
+        import asyncio
+
+        import httpx
+        from unittest.mock import patch
+
+        import routes.misc as misc_mod
+        import routes.talk as talk_mod
+        import chats as chats_mod
+        from app import app
+
+        async def _run():
+            processed: list[str] = []
+            gate = asyncio.Event()
+
+            async def mock_run_pi(transcript, chat, save_path="", model=""):
+                processed.append(transcript)
+                if len(processed) == 1:
+                    gate.set()  # first request is now inside the lock
+                    # stall so the other requests queue up behind it
+                    await asyncio.sleep(0.3)
+                return f"reply to {transcript}"
+
+            with (
+                patch.object(chats_mod, "DEVELOPER_DIR", tmp_dev),
+                patch.object(chats_mod, "CHATS_FILE", tmp_dev / "chats.json"),
+                patch.object(talk_mod, "DEVELOPER_DIR", tmp_dev),
+                patch.object(misc_mod, "DEVELOPER_DIR", tmp_dev),
+                patch("chats.save_chats", lambda: None),
+                patch.object(talk_mod, "run_pi", mock_run_pi),
+            ):
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                    payloads = [f"turn {i}" for i in range(5)]
+                    tasks = [
+                        asyncio.create_task(
+                            ac.post(
+                                "/api/talk",
+                                data={"chat_id": chat_id, "text": p, "audio_response": "false"},
+                            )
+                        )
+                        for p in payloads
+                    ]
+                    # Wait for first task to enter the lock, then let all queue up
+                    await asyncio.wait_for(gate.wait(), timeout=5)
+                    await asyncio.sleep(0.2)  # let others queue behind the lock
+
+                    # By now all 5 should be in the waiter queue (only 1 processed)
+                    assert len(processed) == 1, f"Expected 1 processed, got {processed}"
+
+                    # Unblock: let all finish
+                    responses = await asyncio.gather(*tasks)
+
+                    # All requests must succeed
+                    for r in responses:
+                        assert r.status_code == 200, f"Got status {r.status_code}: {r.text[:200]}"
+
+                    # Processed order must match submission order
+                    assert processed == payloads, f"FIFO violated: {processed} != {payloads}"
 
         asyncio.run(_run())
 

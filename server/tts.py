@@ -8,11 +8,10 @@ import subprocess
 import uuid
 from pathlib import Path
 
-from fastapi import HTTPException
-
-from config import AUDIO_DIR, GOOGLE_TTS_VOICE, TTS_SPEAKING_RATE, TTS_VOICE
+from config import ASSETS_DIR, AUDIO_DIR, GOOGLE_TTS_VOICE, TTS_SPEAKING_RATE, TTS_VOICE
 
 _SAY_BASE_WPM = 180  # approximate default WPM for macOS say voices
+_STATIC_FALLBACK = ASSETS_DIR / "audio-unavailable.m4a"
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -31,31 +30,69 @@ def _split_sentences(text: str) -> list[str]:
     return chunks or [text]
 
 
-async def synthesize(text: str, provider: str = "say", speaking_rate: float = TTS_SPEAKING_RATE) -> Path:
+async def synthesize(
+    text: str, provider: str = "say", speaking_rate: float = TTS_SPEAKING_RATE
+) -> tuple[Path, bool]:
+    """Synthesize text to speech.
+
+    Returns (audio_path, degraded) where degraded=True means the
+    static fallback clip was used.  Never raises for provider-failure
+    reasons.
+    """
     if provider == "google":
-        return await _google_tts(text, speaking_rate=speaking_rate)
-    return await _say_tts(text, speaking_rate=speaking_rate)
+        try:
+            path = await _google_tts(text, speaking_rate=speaking_rate)
+            return (path, False)
+        except Exception:
+            pass
+        # Google failed — fall back to say
+        try:
+            path = await _say_tts(text, speaking_rate=speaking_rate)
+            return (path, False)
+        except Exception:
+            return (_STATIC_FALLBACK, True)
+    else:
+        # say (the default), or any future provider
+        try:
+            path = await _say_tts(text, speaking_rate=speaking_rate)
+            return (path, False)
+        except Exception:
+            # One-way rule: never fall *up* to Google if the user
+            # explicitly chose say and it failed.
+            return (_STATIC_FALLBACK, True)
 
 
-async def synthesize_chunked(text: str, provider: str = "say", speaking_rate: float = TTS_SPEAKING_RATE) -> list[Path]:
+async def synthesize_chunked(
+    text: str, provider: str = "say", speaking_rate: float = TTS_SPEAKING_RATE
+) -> tuple[list[Path], bool]:
+    """Synthesize text in sentence chunks.
+
+    Returns (paths, any_degraded).  Never raises for provider-failure
+    reasons — per-chunk fallback is handled inside synthesize().
+    """
     sentences = _split_sentences(text)
     if len(sentences) == 1:
-        return [await synthesize(text, provider, speaking_rate=speaking_rate)]
+        path, degraded = await synthesize(text, provider, speaking_rate=speaking_rate)
+        return ([path], degraded)
     results = await asyncio.gather(
         *[synthesize(s, provider, speaking_rate=speaking_rate) for s in sentences],
         return_exceptions=True,
     )
-    paths = []
+    paths: list[Path] = []
+    any_degraded = False
     for r in results:
         if isinstance(r, Exception):
             raise r
-        paths.append(r)
-    return paths
+        path, degraded = r
+        paths.append(path)
+        if degraded:
+            any_degraded = True
+    return (paths, any_degraded)
 
 
 async def _say_tts(text: str, speaking_rate: float = 1.0) -> Path:
     if not shutil.which("say"):
-        raise HTTPException(500, "`say` not found — macOS only")
+        raise RuntimeError("`say` not found — macOS only")
 
     uid = uuid.uuid4().hex
     aiff = AUDIO_DIR / f"{uid}.aiff"
@@ -86,7 +123,7 @@ def _get_google_token() -> str:
     creds_json = get_google_tts_credentials()
 
     if not creds_json:
-        raise HTTPException(500, "google-tts-service-account not found in pass")
+        raise RuntimeError("google-tts-service-account not found in pass")
 
     if _google_creds is None:
         info = json.loads(creds_json)
@@ -120,7 +157,7 @@ async def _google_tts(text: str, speaking_rate: float = 1.0) -> Path:
             headers={"Authorization": f"Bearer {token}"},
         )
         if resp.status_code != 200:
-            raise HTTPException(502, f"Google TTS error {resp.status_code}: {resp.text[:200]}")
+            raise RuntimeError(f"Google TTS error {resp.status_code}: {resp.text[:200]}")
 
     out.write_bytes(base64.b64decode(resp.json()["audioContent"]))
     return out

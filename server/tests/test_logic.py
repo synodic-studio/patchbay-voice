@@ -630,3 +630,198 @@ class TestAudioMime:
             r = client.get("/audio/test.wav")
         assert r.status_code == 200
         assert r.headers["content-type"] == "application/octet-stream"
+
+    def test_serves_static_fallback_clip_from_assets_dir(self, client, tmp_path):
+        """The static TTS-unavailable clip lives in ASSETS_DIR, not AUDIO_DIR —
+        /audio/{name} must still be able to serve it, or audio_degraded turns
+        would report success while the actual audio 404s."""
+        from unittest.mock import patch
+
+        empty_audio_dir = tmp_path / "audio"
+        empty_audio_dir.mkdir()
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        clip = assets_dir / "audio-unavailable.m4a"
+        clip.write_bytes(b"fake clip")
+
+        with patch("routes.misc.AUDIO_DIR", empty_audio_dir), patch("routes.misc.ASSETS_DIR", assets_dir):
+            r = client.get("/audio/audio-unavailable.m4a")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "audio/mp4"
+
+    def test_still_404s_when_missing_from_both_dirs(self, client, tmp_path):
+        from unittest.mock import patch
+
+        with patch("routes.misc.AUDIO_DIR", tmp_path), patch("routes.misc.ASSETS_DIR", tmp_path):
+            r = client.get("/audio/nope.mp3")
+        assert r.status_code == 404
+
+
+# ── tts.synthesize fallback chain ─────────────────────────────────────────
+
+
+class TestTtsFallback:
+    """Tests for the one-way TTS fallback chain: Google → say → static clip."""
+
+    def test_google_fallback_to_say_succeeds(self, tmp_path):
+        """Google failure → falls back to say → returns say path, not degraded."""
+        import asyncio
+
+        from unittest.mock import AsyncMock, patch
+
+        import tts as tts_mod
+
+        say_path = tmp_path / "say.m4a"
+        say_path.write_bytes(b"say audio")
+
+        with (
+            patch("tts._google_tts", side_effect=RuntimeError("google down")),
+            patch("tts._say_tts", new_callable=AsyncMock, return_value=say_path),
+        ):
+            path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="google"))
+
+        assert path == say_path
+        assert not degraded
+
+    def test_google_and_say_both_fail_returns_static(self, tmp_path):
+        """Google failure → say also fails → returns static clip path, degraded."""
+        import asyncio
+
+        from unittest.mock import AsyncMock, patch
+
+        import tts as tts_mod
+
+        with (
+            patch("tts._google_tts", side_effect=RuntimeError("google down")),
+            patch("tts._say_tts", side_effect=RuntimeError("say not available")),
+        ):
+            path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="google"))
+
+        assert path == tts_mod._STATIC_FALLBACK
+        assert degraded
+
+    def test_say_failure_does_not_call_google(self, tmp_path):
+        """Say (as primary) failure → static clip directly, NEVER calls _google_tts."""
+        import asyncio
+
+        from unittest.mock import AsyncMock, patch
+
+        import tts as tts_mod
+
+        google_mock = AsyncMock()
+        with (
+            patch("tts._say_tts", side_effect=RuntimeError("say not available")),
+            patch("tts._google_tts", google_mock),
+        ):
+            path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="say"))
+
+        assert path == tts_mod._STATIC_FALLBACK
+        assert degraded
+        google_mock.assert_not_called()
+
+    def test_say_normal_no_degradation(self, tmp_path):
+        """Say works normally — not degraded, returns say path."""
+        import asyncio
+
+        from unittest.mock import AsyncMock, patch
+
+        import tts as tts_mod
+
+        say_path = tmp_path / "say.m4a"
+        say_path.write_bytes(b"say audio")
+
+        with patch("tts._say_tts", new_callable=AsyncMock, return_value=say_path):
+            path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="say"))
+
+        assert path == say_path
+        assert not degraded
+
+    def test_google_normal_no_degradation(self, tmp_path):
+        """Google works normally — not degraded, returns google path."""
+        import asyncio
+
+        from unittest.mock import AsyncMock, patch
+
+        import tts as tts_mod
+
+        google_path = tmp_path / "out.mp3"
+        google_path.write_bytes(b"google audio")
+
+        with patch("tts._google_tts", new_callable=AsyncMock, return_value=google_path):
+            path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="google"))
+
+        assert path == google_path
+        assert not degraded
+
+    def test_multi_chunk_one_chunk_falls_back_to_say(self, tmp_path):
+        """Multi-chunk: first chunk's Google fails, falls back to say; other chunks fine."""
+        import asyncio
+
+        from unittest.mock import patch
+
+        import tts as tts_mod
+
+        say_path = tmp_path / "say.m4a"
+        say_path.write_bytes(b"say")
+        google_success = tmp_path / "google.mp3"
+        google_success.write_bytes(b"google")
+
+        call_count = 0
+
+        async def mock_google(text, speaking_rate=1.0):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("google down for first chunk")
+            return google_success
+
+        with (
+            patch("tts._split_sentences", return_value=["First.", "Second.", "Third."]),
+            patch("tts._google_tts", mock_google),
+            patch("tts._say_tts", return_value=say_path),
+        ):
+            paths, any_degraded = asyncio.run(
+                tts_mod.synthesize_chunked("First. Second. Third.", provider="google")
+            )
+
+        assert len(paths) == 3
+        assert paths[0] == say_path  # first chunk fell back to say
+        assert paths[1] == google_success
+        assert paths[2] == google_success
+        # Not degraded overall — the failed chunk successfully fell back to say
+        assert not any_degraded
+
+    def test_multi_chunk_one_chunk_both_providers_fail(self, tmp_path):
+        """Multi-chunk: one chunk fails both Google and say → static clip for that chunk."""
+        import asyncio
+
+        from unittest.mock import patch
+
+        import tts as tts_mod
+
+        google_success = tmp_path / "google.mp3"
+        google_success.write_bytes(b"google")
+
+        call_count = 0
+
+        async def mock_google(text, speaking_rate=1.0):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("google down for first chunk")
+            return google_success
+
+        with (
+            patch("tts._split_sentences", return_value=["First.", "Second.", "Third."]),
+            patch("tts._google_tts", mock_google),
+            patch("tts._say_tts", side_effect=RuntimeError("say also down")),
+        ):
+            paths, any_degraded = asyncio.run(
+                tts_mod.synthesize_chunked("First. Second. Third.", provider="google")
+            )
+
+        assert len(paths) == 3
+        assert paths[0] == tts_mod._STATIC_FALLBACK  # both failed → static clip
+        assert paths[1] == google_success
+        assert paths[2] == google_success
+        assert any_degraded

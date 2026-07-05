@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 import asr
 from chats import _chats
-from config import AUDIO_DIR, DEVELOPER_DIR, PI_BIN, PI_MODEL, PI_PROVIDER, STATIC_DIR, TTS_VOICE, WHISPER_MODEL
+from config import ASSETS_DIR, AUDIO_DIR, DEVELOPER_DIR, PI_BIN, PI_MODEL, PI_PROVIDER, STATIC_DIR, TTS_VOICE, WHISPER_MODEL
 
 router = APIRouter()
 
@@ -84,9 +84,16 @@ def list_projects():
 
 @router.get("/audio/{name}")
 def get_audio(name: str):
-    path = AUDIO_DIR / Path(name).name
+    safe_name = Path(name).name
+    path = AUDIO_DIR / safe_name
     if not path.exists():
-        raise HTTPException(404, "audio expired")
+        # Static fallback clips (e.g. the TTS-unavailable notice) live in
+        # ASSETS_DIR, not AUDIO_DIR — check there before giving up.
+        asset_path = ASSETS_DIR / safe_name
+        if asset_path.is_file() and asset_path.parent == ASSETS_DIR:
+            path = asset_path
+        else:
+            raise HTTPException(404, "audio expired")
     if path.suffix == ".m4a":
         media = "audio/mp4"
     elif path.suffix == ".mp3":
