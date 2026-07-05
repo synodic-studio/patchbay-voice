@@ -1,0 +1,13 @@
+.git
+ios
+build
+vendor
+.pi
+docs
+brew
+scripts
+*.xcodeproj
+*.xcworkspace
+**/.venv
+**/__pycache__
+**/.DS_Store

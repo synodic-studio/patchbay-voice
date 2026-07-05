@@ -661,7 +661,7 @@ class TestAudioMime:
 
 
 class TestTtsFallback:
-    """Tests for the one-way TTS fallback chain: Google → say → static clip."""
+    """Tests for the one-way TTS fallback chain: Google → local engine → static clip."""
 
     def test_google_fallback_to_say_succeeds(self, tmp_path):
         """Google failure → falls back to say → returns say path, not degraded."""
@@ -676,7 +676,7 @@ class TestTtsFallback:
 
         with (
             patch("tts._google_tts", side_effect=RuntimeError("google down")),
-            patch("tts._say_tts", new_callable=AsyncMock, return_value=say_path),
+            patch("tts._local_tts", new_callable=AsyncMock, return_value=say_path),
         ):
             path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="google"))
 
@@ -693,7 +693,7 @@ class TestTtsFallback:
 
         with (
             patch("tts._google_tts", side_effect=RuntimeError("google down")),
-            patch("tts._say_tts", side_effect=RuntimeError("say not available")),
+            patch("tts._local_tts", side_effect=RuntimeError("say not available")),
         ):
             path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="google"))
 
@@ -710,7 +710,7 @@ class TestTtsFallback:
 
         google_mock = AsyncMock()
         with (
-            patch("tts._say_tts", side_effect=RuntimeError("say not available")),
+            patch("tts._local_tts", side_effect=RuntimeError("say not available")),
             patch("tts._google_tts", google_mock),
         ):
             path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="say"))
@@ -730,7 +730,7 @@ class TestTtsFallback:
         say_path = tmp_path / "say.m4a"
         say_path.write_bytes(b"say audio")
 
-        with patch("tts._say_tts", new_callable=AsyncMock, return_value=say_path):
+        with patch("tts._local_tts", new_callable=AsyncMock, return_value=say_path):
             path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="say"))
 
         assert path == say_path
@@ -778,7 +778,7 @@ class TestTtsFallback:
         with (
             patch("tts._split_sentences", return_value=["First.", "Second.", "Third."]),
             patch("tts._google_tts", mock_google),
-            patch("tts._say_tts", return_value=say_path),
+            patch("tts._local_tts", return_value=say_path),
         ):
             paths, any_degraded = asyncio.run(
                 tts_mod.synthesize_chunked("First. Second. Third.", provider="google")
@@ -814,7 +814,7 @@ class TestTtsFallback:
         with (
             patch("tts._split_sentences", return_value=["First.", "Second.", "Third."]),
             patch("tts._google_tts", mock_google),
-            patch("tts._say_tts", side_effect=RuntimeError("say also down")),
+            patch("tts._local_tts", side_effect=RuntimeError("say also down")),
         ):
             paths, any_degraded = asyncio.run(
                 tts_mod.synthesize_chunked("First. Second. Third.", provider="google")
