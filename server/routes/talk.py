@@ -30,6 +30,9 @@ router = APIRouter()
 # No additional ordering mechanism is needed — see ADR 0002.
 _talk_locks: dict[str, asyncio.Lock] = {}
 
+# Generic spoken notice for Failed turns — never the raw technical detail.
+GENERIC_FAILURE_NOTICE = "Something went wrong, please try again."
+
 
 @router.post("/api/talk")
 async def talk(
@@ -81,24 +84,75 @@ async def talk(
         t_asr = 0.0
         if text and text.strip():
             transcript = text.strip()
+            failed = False
+            reply = None
         elif audio is not None:
             suffix = ".webm" if audio.filename and audio.filename.endswith(".webm") else ".m4a"
             tmp = AUDIO_DIR / f"in-{uuid.uuid4().hex}{suffix}"
             tmp.write_bytes(await audio.read())
             t0 = time.time()
-            transcript = await asr_mod.transcribe(tmp)
-            tmp.unlink(missing_ok=True)
+            try:
+                transcript = await asr_mod.transcribe(tmp)
+                failed = False
+                reply = None
+            except Exception as exc:
+                transcript = "(couldn't understand audio)"
+                failed = True
+                reply = str(exc)
+            finally:
+                tmp.unlink(missing_ok=True)
             t_asr = time.time() - t0
         else:
             raise HTTPException(400, "Provide audio or text")
 
-        if not transcript:
-            return JSONResponse({"transcript": "", "reply": "No speech detected.", "audio_url": None, "audio_urls": [], "audio_degraded": False})
+        # No speech detected — not a failure, just empty input
+        if not transcript and not failed:
+            return JSONResponse(
+                {
+                    "transcript": "",
+                    "reply": "No speech detected.",
+                    "audio_url": None,
+                    "audio_urls": [],
+                    "audio_degraded": False,
+                    "failed": False,
+                }
+            )
+
+        # ASR failure — persist Failed turn with placeholder, speak generic notice
+        if failed:
+            add_turn(chat.id, transcript, reply, failed=True)
+            if want_commit:
+                _git_commit(project_dir, clean_save, branch=auto_commit_branch)
+            audio_urls, audio_degraded = await _synthesize_audio(
+                GENERIC_FAILURE_NOTICE, want_audio, want_chunked, tts_provider, speaking_rate
+            )
+            chat.last_active = time.time()
+            save_chats()
+            return _failed_response(transcript, reply, audio_urls, audio_degraded)
 
         # Run pi
         t1 = time.time()
-        reply = await run_pi(transcript, chat, save_path=clean_save, model=model)
+        try:
+            reply = await run_pi(transcript, chat, save_path=clean_save, model=model)
+        except HTTPException as exc:
+            reply = exc.detail
+            failed = True
+        except Exception as exc:
+            reply = str(exc)
+            failed = True
         t_llm = time.time() - t1
+
+        # pi failure — persist Failed turn with real transcript, speak generic notice
+        if failed:
+            add_turn(chat.id, transcript, reply, failed=True)
+            if want_commit:
+                _git_commit(project_dir, clean_save, branch=auto_commit_branch)
+            audio_urls, audio_degraded = await _synthesize_audio(
+                GENERIC_FAILURE_NOTICE, want_audio, want_chunked, tts_provider, speaking_rate
+            )
+            chat.last_active = time.time()
+            save_chats()
+            return _failed_response(transcript, reply, audio_urls, audio_degraded)
 
         # Save turn immediately so it persists even if TTS fails
         if reply and reply != "(no response)":
@@ -109,24 +163,10 @@ async def talk(
 
         # TTS — synthesize never raises for provider failures, so the
         # try/except here is only a safety net for truly unexpected bugs.
-        audio_urls: list[str] = []
-        audio_degraded = False
         t2 = time.time()
-        if want_audio and reply:
-            try:
-                if want_chunked:
-                    paths, audio_degraded = await tts_mod.synthesize_chunked(
-                        reply, provider=tts_provider, speaking_rate=speaking_rate
-                    )
-                else:
-                    path, audio_degraded = await tts_mod.synthesize(
-                        reply, provider=tts_provider, speaking_rate=speaking_rate
-                    )
-                    paths = [path]
-                audio_urls = [f"/audio/{p.name}" for p in paths]
-            except Exception as exc:
-                print(f"[tts] error: {exc}", file=sys.stderr)
-                audio_degraded = True
+        audio_urls, audio_degraded = await _synthesize_audio(
+            reply, want_audio, want_chunked, tts_provider, speaking_rate
+        )
         t_tts = time.time() - t2
 
         chat.last_active = time.time()
@@ -144,8 +184,57 @@ async def talk(
                 "audio_url": audio_urls[0] if audio_urls else None,
                 "audio_urls": audio_urls,
                 "audio_degraded": audio_degraded,
+                "failed": False,
             }
         )
+
+
+async def _synthesize_audio(
+    text: str,
+    want_audio: bool,
+    want_chunked: bool,
+    tts_provider: str,
+    speaking_rate: float,
+) -> tuple[list[str], bool]:
+    """Synthesize text to audio URLs.
+
+    Returns (audio_urls, audio_degraded).  Never raises for provider failures
+    — the caller always gets a valid (possibly empty) result.
+    """
+    audio_urls: list[str] = []
+    audio_degraded = False
+    if want_audio and text:
+        try:
+            if want_chunked:
+                paths, audio_degraded = await tts_mod.synthesize_chunked(
+                    text, provider=tts_provider, speaking_rate=speaking_rate
+                )
+            else:
+                path, audio_degraded = await tts_mod.synthesize(
+                    text, provider=tts_provider, speaking_rate=speaking_rate
+                )
+                paths = [path]
+            audio_urls = [f"/audio/{p.name}" for p in paths]
+        except Exception as exc:
+            print(f"[tts] error: {exc}", file=sys.stderr)
+            audio_degraded = True
+    return audio_urls, audio_degraded
+
+
+def _failed_response(
+    transcript: str, reply: str, audio_urls: list[str], audio_degraded: bool
+) -> JSONResponse:
+    """Build the JSON response for a Failed turn."""
+    return JSONResponse(
+        {
+            "transcript": transcript,
+            "reply": reply,
+            "audio_url": audio_urls[0] if audio_urls else None,
+            "audio_urls": audio_urls,
+            "audio_degraded": audio_degraded,
+            "failed": True,
+        }
+    )
 
 
 def _truthy(val: str) -> bool:

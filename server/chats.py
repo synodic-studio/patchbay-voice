@@ -19,6 +19,7 @@ class Turn:
     transcript: str
     reply: str
     created_at: float = field(default_factory=time.time)
+    failed: bool = False
 
 
 @dataclass
@@ -50,7 +51,8 @@ def load_chats() -> None:
         )
         # Load turns
         for t_raw in raw.get("turns", []):
-            turn = Turn(**{f: t_raw.get(f) for f in Turn.__dataclass_fields__})
+            kwargs = {f: t_raw[f] for f in Turn.__dataclass_fields__ if f in t_raw}
+            turn = Turn(**kwargs)
             _turns.setdefault(turn.chat_id, []).append(turn)
     except Exception as exc:
         print(
@@ -80,8 +82,8 @@ def save_chats() -> None:
         raise
 
 
-def add_turn(chat_id: str, transcript: str, reply: str) -> Turn:
-    turn = Turn(id=uuid.uuid4().hex, chat_id=chat_id, transcript=transcript, reply=reply)
+def add_turn(chat_id: str, transcript: str, reply: str, failed: bool = False) -> Turn:
+    turn = Turn(id=uuid.uuid4().hex, chat_id=chat_id, transcript=transcript, reply=reply, failed=failed)
     _turns.setdefault(chat_id, []).append(turn)
     save_chats()
     return turn

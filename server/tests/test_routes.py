@@ -217,6 +217,197 @@ class TestTalkResponseShape:
         assert r.status_code in (200, 400)
 
 
+# ── /api/talk — Failed turn (pi + ASR failures) ──────────────────────────────
+
+
+class TestTalkFailedTurn:
+    """ADR 0003: Failed turns persist transcript, speak generic notice."""
+
+    def test_asr_failure_returns_failed_turn(self, client, chat_id, tmp_path):
+        """ASR failure → failed:true, placeholder transcript, reply=technical detail, audio synthesized."""
+        import chats as chats_mod
+        from unittest.mock import AsyncMock, patch
+
+        with (
+            patch("routes.talk.asr_mod.transcribe", side_effect=RuntimeError("whisper crashed")),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(tmp_path / "out.m4a", False)),
+        ):
+            (tmp_path / "out.m4a").write_bytes(b"audio")
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "audio_response": "true"},
+                files={"audio": ("clip.m4a", b"\x00" * 64, "audio/m4a")},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["failed"] is True
+        assert body["transcript"] == "(couldn't understand audio)"
+        assert "whisper crashed" in body["reply"]
+        assert len(body["audio_urls"]) > 0
+
+        # Persisted Turn has failed=True
+        turns = chats_mod.get_turns(chat_id)
+        assert len(turns) == 1
+        assert turns[0].failed is True
+        assert turns[0].transcript == "(couldn't understand audio)"
+
+    def test_pi_failure_returns_failed_turn(self, client, chat_id, tmp_path):
+        """pi failure → failed:true, real transcript persisted, reply=technical detail, audio synthesized."""
+        import chats as chats_mod
+        from unittest.mock import AsyncMock, patch
+
+        from fastapi import HTTPException
+
+        with (
+            patch("routes.talk.run_pi", side_effect=HTTPException(504, "pi timed out after 120s")),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(tmp_path / "out.m4a", False)),
+        ):
+            (tmp_path / "out.m4a").write_bytes(b"audio")
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "my real question", "audio_response": "true"},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["failed"] is True
+        assert body["transcript"] == "my real question"
+        assert "pi timed out" in body["reply"]
+        assert len(body["audio_urls"]) > 0
+
+        # Persisted Turn has failed=True with the real transcript
+        turns = chats_mod.get_turns(chat_id)
+        assert len(turns) == 1
+        assert turns[0].failed is True
+        assert turns[0].transcript == "my real question"
+        assert "pi timed out" in turns[0].reply
+
+    def test_normal_turn_includes_failed_false(self, client, chat_id, tmp_path):
+        """Normal successful turn → response has failed:false, persisted Turn has failed=False."""
+        import chats as chats_mod
+        from unittest.mock import AsyncMock, patch
+
+        (tmp_path / "out.m4a").write_bytes(b"audio")
+        with (
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="Everything is fine."),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(tmp_path / "out.m4a", False)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "hello", "audio_response": "false"},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["failed"] is False
+        assert body["transcript"] == "hello"
+        assert body["reply"] == "Everything is fine."
+
+        # Persisted Turn has failed=False
+        turns = chats_mod.get_turns(chat_id)
+        assert len(turns) >= 1
+        persisted = [t for t in turns if t.transcript == "hello"]
+        assert len(persisted) == 1
+        assert persisted[0].failed is False
+
+    def test_uploaded_audio_cleaned_up_on_asr_failure(self, client, chat_id, tmp_path):
+        """Temp audio file is deleted even when ASR raises."""
+        import routes.talk as talk_mod
+        from unittest.mock import AsyncMock, patch
+
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+
+        with (
+            patch.object(talk_mod, "AUDIO_DIR", audio_dir),
+            patch("routes.talk.asr_mod.transcribe", side_effect=RuntimeError("asr failed")),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "audio_response": "false"},
+                files={"audio": ("clip.m4a", b"\x00" * 64, "audio/m4a")},
+            )
+        assert r.status_code == 200
+        # Temp file must be gone — no files left in AUDIO_DIR
+        remaining = list(audio_dir.iterdir())
+        assert len(remaining) == 0, f"Temp files not cleaned up: {remaining}"
+
+    def test_failed_turn_does_not_block_subsequent_turns(self, client, chat_id, tmp_dev):
+        """A Failed turn does not prevent a subsequently queued turn from processing."""
+        import asyncio
+
+        import httpx
+        from unittest.mock import AsyncMock, patch
+
+        import routes.misc as misc_mod
+        import routes.talk as talk_mod
+        import chats as chats_mod
+        from app import app
+
+        async def _run():
+            order: list[str] = []
+            gate = asyncio.Event()
+
+            async def mock_run_pi(transcript, chat, save_path="", model=""):
+                order.append(f"pi_{transcript}")
+                # First request to enter signals the gate, then stalls
+                if len(order) == 1:
+                    gate.set()
+                    await asyncio.sleep(0.5)
+                # Only after stalling do we decide failure
+                if "fail" in transcript:
+                    from fastapi import HTTPException
+                    raise HTTPException(500, "intentional failure")
+                return f"reply to {transcript}"
+
+            with (
+                patch.object(chats_mod, "DEVELOPER_DIR", tmp_dev),
+                patch.object(chats_mod, "CHATS_FILE", tmp_dev / "chats.json"),
+                patch.object(talk_mod, "DEVELOPER_DIR", tmp_dev),
+                patch.object(misc_mod, "DEVELOPER_DIR", tmp_dev),
+                patch("chats.save_chats", lambda: None),
+                patch.object(talk_mod, "run_pi", mock_run_pi),
+            ):
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                    t1 = asyncio.create_task(
+                        ac.post(
+                            "/api/talk",
+                            data={"chat_id": chat_id, "text": "first fail", "audio_response": "false"},
+                        )
+                    )
+                    await asyncio.wait_for(gate.wait(), timeout=5)
+
+                    t2 = asyncio.create_task(
+                        ac.post(
+                            "/api/talk",
+                            data={"chat_id": chat_id, "text": "second ok", "audio_response": "false"},
+                        )
+                    )
+                    await asyncio.sleep(0.3)
+
+                    # First request entered and is blocking; second is queued
+                    assert len(order) == 1, f"Expected 1 processed, got {order}"
+                    assert order[0] == "pi_first fail"
+
+                    # Let both finish
+                    responses = await asyncio.gather(t1, t2, return_exceptions=True)
+
+                    # First request is a Failed turn (200, failed:true)
+                    r1 = responses[0]
+                    assert r1.status_code == 200
+                    assert r1.json()["failed"] is True
+
+                    # Second request succeeds normally
+                    r2 = responses[1]
+                    assert r2.status_code == 200
+                    assert r2.json()["failed"] is False
+                    assert r2.json()["reply"] == "reply to second ok"
+
+                    # Both turns processed in FIFO order
+                    assert order == ["pi_first fail", "pi_second ok"]
+
+        asyncio.run(_run())
+
+
 # ── /api/talk — audio / TTS ───────────────────────────────────────────────────
 
 
@@ -531,6 +722,36 @@ class TestTalkAutoCommit:
             )
         assert r.status_code == 200
 
+    def test_auto_commit_still_runs_on_a_failed_turn(self, client, chat_id, tmp_dev):
+        """ADR 0003: pi can write a note before crashing on a later step — that
+        note must still be auto-committed even though the turn itself failed."""
+        from fastapi import HTTPException
+
+        proj = tmp_dev / "proj"
+        self._init_repo(proj)
+
+        def fake_pi_writes_then_crashes(*a, **kw):
+            (proj / "docs" / "patchbay").mkdir(parents=True, exist_ok=True)
+            (proj / "docs" / "patchbay" / "note.md").write_text("partial note before crash\n")
+            raise HTTPException(504, "pi timed out after 120s")
+
+        with patch("routes.talk.run_pi", new_callable=AsyncMock, side_effect=fake_pi_writes_then_crashes):
+            r = client.post(
+                "/api/talk",
+                data={
+                    "chat_id": chat_id,
+                    "text": "hi",
+                    "audio_response": "false",
+                    "auto_commit": "true",
+                    "auto_commit_branch": "patchbay",
+                },
+            )
+        assert r.status_code == 200
+        assert r.json()["failed"] is True
+
+        tree_files = self._git_out(proj, "ls-tree", "-r", "--name-only", "patchbay")
+        assert "docs/patchbay/note.md" in tree_files
+
 
 # ── /api/talk — per-chat lock concurrency ──────────────────────────────────
 
@@ -786,6 +1007,31 @@ class TestTalkSession:
         call = mock_pi.await_args
         assert call is not None
         assert call.kwargs.get("model") == "gpt-4o"
+
+
+# ── /api/chats/{id}/turns includes failed field ──────────────────────────────
+
+
+class TestTurnsEndpoint:
+    def test_turns_response_includes_failed_field(self, client, chat_id):
+        """GET /api/chats/{id}/turns includes the failed field."""
+        import chats as chats_mod
+        from unittest.mock import patch
+
+        # Persist a failed turn and a normal turn
+        chats_mod.add_turn(chat_id, "failed transcript", "technical detail", failed=True)
+        chats_mod.add_turn(chat_id, "normal transcript", "normal reply")
+
+        r = client.get(f"/api/chats/{chat_id}/turns")
+        assert r.status_code == 200
+        turns = r.json()["turns"]
+        assert len(turns) == 2
+
+        failed_t = [t for t in turns if t["transcript"] == "failed transcript"][0]
+        assert failed_t["failed"] is True
+
+        normal_t = [t for t in turns if t["transcript"] == "normal transcript"][0]
+        assert normal_t["failed"] is False
 
 
 # ── bearer-token auth ─────────────────────────────────────────────────────────

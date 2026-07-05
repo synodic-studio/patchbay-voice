@@ -43,4 +43,4 @@ def reset_chat(chat_id: str):
 def list_turns(chat_id: str):
     if chat_id not in _chats:
         raise HTTPException(404, "Chat not found")
-    return {"turns": [{"id": t.id, "transcript": t.transcript, "reply": t.reply, "created_at": t.created_at} for t in get_turns(chat_id)]}
+    return {"turns": [{"id": t.id, "transcript": t.transcript, "reply": t.reply, "created_at": t.created_at, "failed": t.failed} for t in get_turns(chat_id)]}
