@@ -8,7 +8,18 @@ import subprocess
 import uuid
 from pathlib import Path
 
-from config import ASSETS_DIR, AUDIO_DIR, GOOGLE_TTS_VOICE, TTS_SPEAKING_RATE, TTS_VOICE
+from config import (
+    ASSETS_DIR,
+    AUDIO_DIR,
+    ESPEAK_BIN,
+    FFMPEG_BIN,
+    GOOGLE_TTS_VOICE,
+    LOCAL_TTS_ENGINE,
+    PIPER_BIN,
+    PIPER_MODEL,
+    TTS_SPEAKING_RATE,
+    TTS_VOICE,
+)
 
 _SAY_BASE_WPM = 180  # approximate default WPM for macOS say voices
 _STATIC_FALLBACK = ASSETS_DIR / "audio-unavailable.m4a"
@@ -45,20 +56,20 @@ async def synthesize(
             return (path, False)
         except Exception:
             pass
-        # Google failed — fall back to say
+        # Google failed — fall back to the local engine
         try:
-            path = await _say_tts(text, speaking_rate=speaking_rate)
+            path = await _local_tts(text, speaking_rate=speaking_rate)
             return (path, False)
         except Exception:
             return (_STATIC_FALLBACK, True)
     else:
-        # say (the default), or any future provider
+        # local engine (the default), or any future provider
         try:
-            path = await _say_tts(text, speaking_rate=speaking_rate)
+            path = await _local_tts(text, speaking_rate=speaking_rate)
             return (path, False)
         except Exception:
             # One-way rule: never fall *up* to Google if the user
-            # explicitly chose say and it failed.
+            # explicitly chose the local engine and it failed.
             return (_STATIC_FALLBACK, True)
 
 
@@ -90,6 +101,43 @@ async def synthesize_chunked(
     return (paths, any_degraded)
 
 
+def _pick_local_engine() -> str | None:
+    """Choose the local (no-credentials) TTS engine.
+
+    Honors LOCAL_TTS_ENGINE when set; otherwise auto-detects in preference
+    order: macOS `say`, then piper (if a voice model is configured), then
+    espeak. Returns None when nothing usable is installed (→ static clip).
+    """
+    if LOCAL_TTS_ENGINE:
+        return LOCAL_TTS_ENGINE
+    if shutil.which("say"):
+        return "say"
+    if PIPER_MODEL and shutil.which(PIPER_BIN):
+        return "piper"
+    if shutil.which(ESPEAK_BIN):
+        return "espeak"
+    return None
+
+
+async def _local_tts(text: str, speaking_rate: float = 1.0) -> Path:
+    engine = _pick_local_engine()
+    if engine == "say":
+        return await _say_tts(text, speaking_rate=speaking_rate)
+    if engine == "piper":
+        return await _piper_tts(text, speaking_rate=speaking_rate)
+    if engine == "espeak":
+        return await _espeak_tts(text, speaking_rate=speaking_rate)
+    raise RuntimeError("no local TTS engine available")
+
+
+def _encode_m4a(src: Path, dst: Path) -> None:
+    """Encode any audio file to AAC/m4a with ffmpeg (cross-platform)."""
+    subprocess.run(
+        [FFMPEG_BIN, "-y", "-loglevel", "error", "-i", str(src), "-c:a", "aac", str(dst)],
+        check=True,
+    )
+
+
 async def _say_tts(text: str, speaking_rate: float = 1.0) -> Path:
     if not shutil.which("say"):
         raise RuntimeError("`say` not found — macOS only")
@@ -103,6 +151,51 @@ async def _say_tts(text: str, speaking_rate: float = 1.0) -> Path:
         subprocess.run(["say", "-v", TTS_VOICE, "-r", wpm, "-o", str(aiff), "--", text], check=True)
         subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", str(aiff), str(out)], check=True)
         aiff.unlink(missing_ok=True)
+
+    await asyncio.to_thread(_run)
+    return out
+
+
+async def _piper_tts(text: str, speaking_rate: float = 1.0) -> Path:
+    """Linux/local neural TTS via piper. Requires PIPER_MODEL (.onnx voice)."""
+    if not PIPER_MODEL or not shutil.which(PIPER_BIN):
+        raise RuntimeError("piper not configured (set PIPER_MODEL and install piper)")
+
+    uid = uuid.uuid4().hex
+    wav = AUDIO_DIR / f"{uid}.wav"
+    out = AUDIO_DIR / f"{uid}.m4a"
+    # piper's length_scale is inverse to speed: faster speech = shorter scale.
+    length_scale = str(round(1.0 / max(0.25, min(4.0, speaking_rate)), 3))
+
+    def _run() -> None:
+        subprocess.run(
+            [PIPER_BIN, "--model", PIPER_MODEL, "--length_scale", length_scale,
+             "--output_file", str(wav)],
+            input=text, text=True, check=True,
+        )
+        _encode_m4a(wav, out)
+        wav.unlink(missing_ok=True)
+
+    await asyncio.to_thread(_run)
+    return out
+
+
+async def _espeak_tts(text: str, speaking_rate: float = 1.0) -> Path:
+    """Lightweight always-available local TTS via espeak-ng (robotic)."""
+    if not shutil.which(ESPEAK_BIN):
+        raise RuntimeError(f"`{ESPEAK_BIN}` not found")
+
+    uid = uuid.uuid4().hex
+    wav = AUDIO_DIR / f"{uid}.wav"
+    out = AUDIO_DIR / f"{uid}.m4a"
+    wpm = str(max(80, int(175 * speaking_rate)))  # espeak default is ~175 wpm
+
+    def _run() -> None:
+        # `--` stops option parsing so a reply starting with '-' can't be
+        # smuggled in as an espeak flag (argv injection).
+        subprocess.run([ESPEAK_BIN, "-s", wpm, "-w", str(wav), "--", text], check=True)
+        _encode_m4a(wav, out)
+        wav.unlink(missing_ok=True)
 
     await asyncio.to_thread(_run)
     return out

@@ -44,6 +44,14 @@ TURNS_FILE = Path(environ.get("TURNS_FILE", "~/.voice-demo-turns.json").strip())
 
 TTS_VOICE = environ.get("TTS_VOICE", "Samantha")
 
+# Local (no-credentials) TTS engine for the fallback chain's middle tier.
+# Empty = auto-detect: macOS `say`, else piper (if PIPER_MODEL is set), else espeak.
+LOCAL_TTS_ENGINE = environ.get("LOCAL_TTS_ENGINE", "").strip()
+PIPER_BIN = environ.get("PIPER_BIN", "piper")
+PIPER_MODEL = environ.get("PIPER_MODEL", "").strip()  # path to a piper .onnx voice
+ESPEAK_BIN = environ.get("ESPEAK_BIN", "espeak-ng")
+FFMPEG_BIN = environ.get("FFMPEG_BIN", "ffmpeg")
+
 # Google TTS service account: env override works as before, but the pass lookup
 # is lazy — only invoked the first time Google TTS actually needs it.
 _google_tts_env_override = environ.get("GOOGLE_TTS_SERVICE_ACCOUNT_JSON")
