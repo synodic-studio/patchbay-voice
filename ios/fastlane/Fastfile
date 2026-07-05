@@ -30,6 +30,7 @@ platform :ios do
 
   desc "Build and upload a new beta to TestFlight"
   lane :beta do
+    bump_build
     sh("security unlock-keychain -p \"$(pass show mac-login-password)\" ~/Library/Keychains/login.keychain-db")
     sh("cd .. && tuist generate --no-open")
 
@@ -86,7 +87,7 @@ platform :ios do
     )
     app_id = "6785742336"
     tf_latest_str = sh(
-      "uv tool run --from authlib --with httpx python3 #{asc_script} build-status --app-id #{app_id} --limit 1 2>&1 | head -1 | grep -oE 'build [0-9]+' | awk '{print $2}'",
+      "uv tool run --from authlib --with httpx python3 #{asc_script} build-status --app-id #{app_id} --limit 1 2>&1 | grep -oE 'build [0-9]+' | head -1 | awk '{print $2}'",
       log: false,
     ).strip
     tf_latest = tf_latest_str.to_i
