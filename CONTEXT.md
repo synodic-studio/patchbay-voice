@@ -9,7 +9,7 @@ The single, ongoing, cumulative conversation for one project directory — at mo
 _Avoid_: session (ambiguous with pi's own session — say "chat" for our object, "pi session" for pi's)
 
 **Turn**:
-One exchange in a chat: a user's transcript paired with the assistant's reply. Audio is a best-effort rendering of the reply, never a requirement for the turn to exist or be delivered — a turn with a reply and no audio is still a complete, successful turn.
+One exchange in a chat: a user's transcript paired with the assistant's reply. Audio is a best-effort, ephemeral rendering of the reply — never a requirement for the turn to exist or be delivered, and never kept beyond the chat's next turn (see docs/adr/0005). The transcript and reply text are the permanent record; audio is not.
 _Avoid_: message, exchange, request
 
 **Degraded turn**:
