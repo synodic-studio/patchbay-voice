@@ -1,0 +1,7 @@
+# Failed turns persist the transcript and speak a generic notice
+
+When `pi` fails to produce a reply — timeout, crash, or a genuine error — the request used to raise straight through to the client with nothing saved: no transcript, no record the message was ever received. We decided this needs its own persisted shape, a `Failed turn`: the transcript is always saved, since what the user said should never silently vanish (the same principle behind `Degraded turn` and the TTS fallback chain in ADR 0001) — even though there's no real reply to pair it with.
+
+The reply slot holds a fixed, generic, spoken-friendly notice ("Something went wrong, please try again") rather than the raw technical failure. That phrase is what gets synthesized and spoken, through the exact same fallback chain as ADR 0001, unmodified. This matters specifically because the app is meant to be used hands-free — the user is often not looking at the screen, so silence on failure would leave them waiting indefinitely with no signal anything happened at all. The specific technical detail (e.g. "pi timed out after 120s") is kept separately in the turn's persisted/on-screen text for later debugging, not spoken.
+
+A Failed turn never blocks the queue from ADR 0002 — the next queued turn on the chat proceeds normally. The API should signal a Failed turn explicitly (a boolean field, mirroring `audio_degraded` from ADR 0001) so clients can render it distinctly rather than inferring failure from reply content.

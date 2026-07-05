@@ -12,6 +12,10 @@ _Avoid_: message, exchange, request
 A turn whose reply audio could not be synthesized by any provider, so a canned static clip plays in its place of the real reply audio. The transcript and text reply are always unaffected — only the audio quality degrades, never the turn's existence.
 _Avoid_: failed turn, broken turn
 
+**Failed turn**:
+A turn where `pi` never produced a reply at all — timeout, crash, or error. The transcript is still persisted (what the user said is never silently lost), and a short, fixed, generic notice is spoken through the same fallback chain as any other reply. Distinct from a `Degraded turn`, which has a complete, correct reply and only lost the ability to speak it — a Failed turn has no real reply to show, only the technical detail kept in its text for later debugging.
+_Avoid_: error turn, degraded turn (these are not the same thing)
+
 **Queued turn**:
 A turn submitted while another turn on the same chat is still being processed. Held server-side in strict submission order and processed as its own independent turn once the chat is free — never dropped, never merged with another turn (grouping queued turns into one combined turn is a possible future mode, not the current behavior).
 _Avoid_: pending message, backlog
