@@ -1,4 +1,8 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+	AgentToolResult,
+	ExtensionAPI,
+	ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -8,10 +12,12 @@ export default function extension(pi: ExtensionAPI) {
 
 	pi.registerTool({
 		name: "write_file",
+		label: "Write file",
 		description:
 			`Save text content to a file inside ${savePathDisplay}/ in the current project directory. ` +
 			"Use this to persist notes, plans, summaries, or anything the user asks you to record. " +
 			"Do not use it to communicate information you could say aloud in your reply.",
+		// Raw JSON Schema (structurally a TypeBox TSchema); cast to satisfy the typed API.
 		parameters: {
 			type: "object",
 			properties: {
@@ -26,22 +32,34 @@ export default function extension(pi: ExtensionAPI) {
 				},
 			},
 			required: ["filename", "content"],
-		},
-		handler: async (params: { filename: string; content: string }) => {
+		} as any,
+		// pi >=0.80 calls execute(toolCallId, params, signal, onUpdate, ctx) and
+		// expects an AgentToolResult ({content:[{type:"text",text}], isError?}).
+		async execute(
+			_toolCallId: string,
+			params: { filename: string; content: string },
+			_signal: AbortSignal | undefined,
+			_onUpdate: unknown,
+			ctx: ExtensionContext,
+		): Promise<AgentToolResult> {
 			const { filename, content } = params;
 
 			if (filename.includes("..") || path.isAbsolute(filename)) {
-				return { error: "Filename must be relative with no path traversal." };
+				return {
+					content: [{ type: "text", text: "Error: filename must be relative with no path traversal." }],
+					isError: true,
+				};
 			}
 
-			const projectDir = pi.getProjectDir();
+			const projectDir = ctx.cwd;
 			const targetDir = path.join(projectDir, savePathDisplay);
 			fs.mkdirSync(targetDir, { recursive: true });
 
 			const targetPath = path.join(targetDir, filename);
 			fs.writeFileSync(targetPath, content, "utf8");
 
-			return { written: path.relative(projectDir, targetPath) };
+			const rel = path.relative(projectDir, targetPath);
+			return { content: [{ type: "text", text: `Wrote ${rel}` }] };
 		},
 	});
 }
