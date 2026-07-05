@@ -92,6 +92,15 @@ class TestChatsRoutes:
         assert r.status_code == 200
         assert client.get("/api/chats").json()["chats"] == []
 
+    def test_delete_chat_purges_its_turns(self, client, chat_id):
+        import chats as chats_mod
+
+        chats_mod.add_turn(chat_id, "hi", "hello")
+        assert chats_mod.get_turns(chat_id)
+        client.delete(f"/api/chats/{chat_id}")
+        assert chats_mod.get_turns(chat_id) == []
+        assert chat_id not in chats_mod._turns
+
     def test_delete_unknown_returns_404(self, client):
         assert client.delete("/api/chats/nope").status_code == 404
 
