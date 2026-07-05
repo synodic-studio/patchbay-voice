@@ -73,6 +73,13 @@ struct ServerClient: Sendable {
         return try JSONDecoder().decode(ServerVersion.self, from: data)
     }
 
+    func fetchTurns(chatID: String) async throws -> [ServerTurn] {
+        let (data, resp) = try await session.data(for: request(path: "/api/chats/\(chatID)/turns"))
+        try checkStatus(resp, data: data)
+        let decoded = try JSONDecoder().decode(ServerTurnsResponse.self, from: data)
+        return decoded.turns
+    }
+
     func fetchAudio(path: String) async throws -> Data {
         let (data, resp) = try await session.data(for: request(path: path))
         try checkStatus(resp, data: data)
@@ -145,6 +152,24 @@ struct ServerClient: Sendable {
     private func field(into body: inout Data, boundary: String, name: String, value: String) {
         body += "--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8
     }
+}
+
+struct ServerTurn: Decodable, Sendable {
+    let id: String
+    let transcript: String
+    let reply: String
+    let createdAt: Double
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case transcript
+        case reply
+        case createdAt = "created_at"
+    }
+}
+
+struct ServerTurnsResponse: Decodable {
+    let turns: [ServerTurn]
 }
 
 struct ServerError: LocalizedError {

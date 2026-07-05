@@ -17,7 +17,7 @@ struct TalkView: View {
         .background(Color.graphiteBase.ignoresSafeArea())
         .task(id: chatManager.currentChatID) {
             guard let id = chatManager.currentChatID else { return }
-            viewModel.loadTurns(forChatID: id)
+            viewModel.loadTurns(forChatID: id, client: chatManager.client)
         }
         .onChange(of: chatManager.lastResetToken) {
             guard let id = chatManager.currentChatID else { return }

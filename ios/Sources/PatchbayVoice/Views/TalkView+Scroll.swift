@@ -31,7 +31,7 @@ extension TalkView {
                 bubbleRow(turn)
             }
             processingIndicator
-            queuedMessage
+            queuedIndicator
         }
     }
 
@@ -117,9 +117,10 @@ extension TalkView {
         .padding(.vertical, 4)
     }
 
-    @ViewBuilder var queuedMessage: some View {
-        if viewModel.pendingText != nil || viewModel.pendingAudioData != nil {
-            Text("1 message queued")
+    @ViewBuilder var queuedIndicator: some View {
+        if viewModel.inFlightCount > 1 {
+            let n = viewModel.inFlightCount - 1
+            Text("\(n) message\(n == 1 ? "" : "s") queued")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .center)

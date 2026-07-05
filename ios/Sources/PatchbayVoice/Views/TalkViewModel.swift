@@ -5,12 +5,15 @@ import Observation
 @Observable
 final class TalkViewModel {
     var turns: [TurnItem] = []
-    var isProcessing = false
     var statusMessage = "Thinking…"
     var errorMessage: String?
-    var pendingText: String?
-    var pendingAudioData: Data?
-    private var statusTask: Task<Void, Never>?
+    // internal (not private): TalkViewModel+Status.swift extends this from another file
+    var statusTask: Task<Void, Never>?
+    private(set) var inFlightCount = 0
+
+    /// True when at least one turn submission is in-flight to the server.
+    /// Used for UI feedback (spinner, status text) but never to gate submissions.
+    var isProcessing: Bool { inFlightCount > 0 }
 
     let recorder = RecorderManager()
     let player = PlayerManager()
@@ -20,16 +23,34 @@ final class TalkViewModel {
     var hasReplayable: Bool { !lastAudioChunks.isEmpty }
     var isCapturing: Bool { recorder.isRecording || isMockRecording }
 
-    func loadTurns(forChatID id: String) {
+    func loadTurns(forChatID id: String, client: ServerClient? = nil) {
         lastAudioChunks = []
         player.stop()
-        guard let data = UserDefaults.standard.data(forKey: "turns.\(id)"),
-              let saved = try? JSONDecoder().decode([TurnItem].self, from: data)
-        else {
+        // Load local turns
+        if let data = UserDefaults.standard.data(forKey: "turns.\(id)"),
+           let saved = try? JSONDecoder().decode([TurnItem].self, from: data)
+        {
+            turns = saved
+        } else {
             turns = []
-            return
         }
-        turns = saved
+        // Also fetch server-side turns and merge
+        guard let client else { return }
+        Task { await _mergeServerTurns(forChatID: id, client: client) }
+    }
+
+    private func _mergeServerTurns(forChatID id: String, client: ServerClient) async {
+        // Server turns are optional — silently ignore fetch failures
+        guard let serverTurns = try? await client.fetchTurns(chatID: id) else { return }
+        let local = Set(turns.map { $0.transcript + "|" + $0.reply })
+        let missing = serverTurns
+            .filter { !local.contains($0.transcript + "|" + $0.reply) }
+            .map { TurnItem(transcript: $0.transcript, reply: $0.reply) }
+        guard !missing.isEmpty else { return }
+        turns.append(contentsOf: missing)
+        if let data = try? JSONEncoder().encode(turns) {
+            UserDefaults.standard.set(data, forKey: "turns.\(id)")
+        }
     }
 
     func clearHistory(forChatID id: String) {
@@ -50,7 +71,7 @@ final class TalkViewModel {
 
     func mockTurn(chat: Chat) {
         isMockRecording = false
-        isProcessing = true
+        inFlightCount += 1
         Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             _appendTurn(TurnItem(
@@ -59,27 +80,19 @@ final class TalkViewModel {
                     + " Sessions button, settings button, and session rows"
                     + " now have stable IDs so headless screenshot capture runs fully automated.",
             ), chat: chat)
-            isProcessing = false
+            inFlightCount -= 1
         }
     }
 
     func stopAndSend(chat: Chat, client: ServerClient) async {
         guard let fileURL = recorder.stop() else { return }
         guard let audio = try? Data(contentsOf: fileURL) else { return }
-        if isProcessing {
-            pendingAudioData = audio
-            return
-        }
         await _processAudioTurn(audio: audio, chat: chat, client: client)
     }
 
     func sendTextTurn(text: String, chat: Chat, client: ServerClient) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        if isProcessing {
-            pendingText = trimmed
-            return
-        }
         await _processTextTurn(text: trimmed, chat: chat, client: client)
     }
 
@@ -100,8 +113,9 @@ extension TalkViewModel {
     }
 
     private func _processAudioTurn(audio: Data, chat: Chat, client: ServerClient) async {
-        isProcessing = true
-        _startStatusTimer()
+        let isOnlyTurnInFlight = inFlightCount == 0
+        inFlightCount += 1
+        if isOnlyTurnInFlight { startStatusTimer() }
         do {
             let response = try await client.sendTurn(chatID: chat.id, audioData: audio, settings: .current)
             _appendTurn(TurnItem(transcript: response.transcript, reply: response.reply), chat: chat)
@@ -109,16 +123,14 @@ extension TalkViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
-        isProcessing = false
-        statusTask?.cancel()
-        statusTask = nil
-        statusMessage = "Thinking…"
-        await _drainPending(chat: chat, client: client)
+        inFlightCount -= 1
+        _stopStatusTimerIfIdle()
     }
 
     private func _processTextTurn(text: String, chat: Chat, client: ServerClient) async {
-        isProcessing = true
-        _startStatusTimer()
+        let isOnlyTurnInFlight = inFlightCount == 0
+        inFlightCount += 1
+        if isOnlyTurnInFlight { startStatusTimer() }
         do {
             let response = try await client.sendTextTurn(chatID: chat.id, text: text, settings: .current)
             _appendTurn(TurnItem(transcript: text, reply: response.reply), chat: chat)
@@ -126,17 +138,25 @@ extension TalkViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
-        isProcessing = false
+        inFlightCount -= 1
+        _stopStatusTimerIfIdle()
+    }
+
+    /// Only the sole in-flight turn may drive the shared status line — with
+    /// several turns queued concurrently, an earlier or later one finishing
+    /// (or starting its audio phase) must not stomp on whichever turn is
+    /// actually still being waited on.
+    private func _stopStatusTimerIfIdle() {
+        guard inFlightCount == 0 else { return }
         statusTask?.cancel()
         statusTask = nil
         statusMessage = "Thinking…"
-        await _drainPending(chat: chat, client: client)
     }
 
     private func _playResponse(_ response: TurnResponse, client: ServerClient) async {
         let paths = response.allAudioPaths
         guard !paths.isEmpty else { return }
-        statusMessage = "Generating audio…"
+        if inFlightCount == 1 { statusMessage = "Generating audio…" }
         do {
             let chunks = try await _fetchAllChunks(paths: paths, client: client)
             lastAudioChunks = chunks
@@ -163,29 +183,6 @@ extension TalkViewModel {
     ) {
         for (offset, path) in paths.enumerated() {
             group.addTask { try await (offset, client.fetchAudio(path: path)) }
-        }
-    }
-
-    private func _drainPending(chat: Chat, client: ServerClient) async {
-        if let pendingAudioData {
-            self.pendingAudioData = nil
-            await _processAudioTurn(audio: pendingAudioData, chat: chat, client: client)
-        } else if let pendingText {
-            self.pendingText = nil
-            await _processTextTurn(text: "Queued while you were working: \(pendingText)", chat: chat, client: client)
-        }
-    }
-
-    private func _startStatusTimer() {
-        statusTask?.cancel()
-        statusMessage = "Transcribing…"
-        statusTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard !Task.isCancelled else { return }
-            statusMessage = "Thinking…"
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
-            guard !Task.isCancelled else { return }
-            statusMessage = "Still thinking…"
         }
     }
 }

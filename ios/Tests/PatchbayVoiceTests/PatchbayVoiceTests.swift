@@ -107,3 +107,27 @@ struct TurnItemTests {
         #expect(t.reply == "response")
     }
 }
+
+// MARK: - TalkViewModel (no-drop submission)
+
+@MainActor
+struct TalkViewModelSubmissionTests {
+    @Test
+    func secondSubmissionDoesNotWaitForTheFirst() async {
+        let viewModel = TalkViewModel()
+        let chat = Chat(id: "c1", name: "proj", projectDir: "proj", createdAt: 0, lastActive: 0)
+
+        viewModel.mockTurn(chat: chat)
+        viewModel.mockTurn(chat: chat)
+
+        // Both fired immediately — nothing gated the second behind the first.
+        #expect(viewModel.inFlightCount == 2)
+        #expect(viewModel.isProcessing)
+
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+        // Both completed independently; neither was dropped or merged.
+        #expect(viewModel.inFlightCount == 0)
+        #expect(viewModel.turns.count == 2)
+    }
+}

@@ -38,7 +38,7 @@ struct TalkButtonView: View {
                         }
                     },
             )
-            .disabled(viewModel.pendingAudioData != nil || chatManager.currentChat == nil)
+            .disabled(chatManager.currentChat == nil)
             .animation(.easeInOut(duration: 0.15), value: viewModel.isCapturing)
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
