@@ -17,7 +17,7 @@ A turn whose reply audio could not be synthesized by any provider, so a canned s
 _Avoid_: failed turn, broken turn
 
 **Failed turn**:
-A turn where `pi` never produced a reply at all — timeout, crash, or error. The transcript is still persisted (what the user said is never silently lost), and a short, fixed, generic notice is spoken through the same fallback chain as any other reply. Distinct from a `Degraded turn`, which has a complete, correct reply and only lost the ability to speak it — a Failed turn has no real reply to show, only the technical detail kept in its text for later debugging.
+A turn where no reply was ever produced — pi timing out, crashing, or erroring, or transcription itself failing before pi is even reached. If a transcript exists, it's persisted (what the user said is never silently lost); if transcription itself failed, the transcript field holds a placeholder instead, since there are no real words to show. Either way, a short, fixed, generic notice is spoken through the same fallback chain as any other reply. Distinct from a `Degraded turn`, which has a complete, correct reply and only lost the ability to speak it — a Failed turn has no real reply to show, only the technical detail kept in its text for later debugging.
 _Avoid_: error turn, degraded turn (these are not the same thing)
 
 **Queued turn**:
