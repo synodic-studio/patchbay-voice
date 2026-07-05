@@ -30,6 +30,11 @@ router = APIRouter()
 # No additional ordering mechanism is needed — see ADR 0002.
 _talk_locks: dict[str, asyncio.Lock] = {}
 
+# Per-chat audio file tracking: maps chat_id → list of Paths for the current/
+# most-recent turn's audio files inside AUDIO_DIR.  The next turn on the same
+# chat evicts these before generating its own audio — see ADR 0005.
+_chat_audio_files: dict[str, list[Path]] = {}
+
 # Generic spoken notice for Failed turns — never the raw technical detail.
 GENERIC_FAILURE_NOTICE = "Something went wrong, please try again."
 
@@ -58,6 +63,8 @@ async def talk(
     if chat_id not in _talk_locks:
         _talk_locks[chat_id] = asyncio.Lock()
     async with _talk_locks[chat_id]:
+        # ADR 0005: evict previous turn's audio before generating this one
+        _evict_chat_audio(chat_id)
         want_audio = _truthy(audio_response)
         want_chunked = _truthy(chunked_audio)
         want_commit = _truthy(auto_commit)
@@ -123,9 +130,10 @@ async def talk(
             add_turn(chat.id, transcript, reply, failed=True)
             if want_commit:
                 _git_commit(project_dir, clean_save, branch=auto_commit_branch)
-            audio_urls, audio_degraded = await _synthesize_audio(
+            audio_urls, audio_degraded, audio_paths = await _synthesize_audio(
                 GENERIC_FAILURE_NOTICE, want_audio, want_chunked, tts_provider, speaking_rate
             )
+            _chat_audio_files[chat_id] = audio_paths
             chat.last_active = time.time()
             save_chats()
             return _failed_response(transcript, reply, audio_urls, audio_degraded)
@@ -147,9 +155,10 @@ async def talk(
             add_turn(chat.id, transcript, reply, failed=True)
             if want_commit:
                 _git_commit(project_dir, clean_save, branch=auto_commit_branch)
-            audio_urls, audio_degraded = await _synthesize_audio(
+            audio_urls, audio_degraded, audio_paths = await _synthesize_audio(
                 GENERIC_FAILURE_NOTICE, want_audio, want_chunked, tts_provider, speaking_rate
             )
+            _chat_audio_files[chat_id] = audio_paths
             chat.last_active = time.time()
             save_chats()
             return _failed_response(transcript, reply, audio_urls, audio_degraded)
@@ -164,9 +173,10 @@ async def talk(
         # TTS — synthesize never raises for provider failures, so the
         # try/except here is only a safety net for truly unexpected bugs.
         t2 = time.time()
-        audio_urls, audio_degraded = await _synthesize_audio(
+        audio_urls, audio_degraded, audio_paths = await _synthesize_audio(
             reply, want_audio, want_chunked, tts_provider, speaking_rate
         )
+        _chat_audio_files[chat_id] = audio_paths
         t_tts = time.time() - t2
 
         chat.last_active = time.time()
@@ -195,13 +205,16 @@ async def _synthesize_audio(
     want_chunked: bool,
     tts_provider: str,
     speaking_rate: float,
-) -> tuple[list[str], bool]:
+) -> tuple[list[str], bool, list[Path]]:
     """Synthesize text to audio URLs.
 
-    Returns (audio_urls, audio_degraded).  Never raises for provider failures
-    — the caller always gets a valid (possibly empty) result.
+    Returns (audio_urls, audio_degraded, audio_paths) where audio_paths
+    contains the Paths inside AUDIO_DIR (never the static fallback clip).
+    Never raises for provider failures — the caller always gets a valid
+    (possibly empty) result.
     """
     audio_urls: list[str] = []
+    audio_paths: list[Path] = []
     audio_degraded = False
     if want_audio and text:
         try:
@@ -215,10 +228,27 @@ async def _synthesize_audio(
                 )
                 paths = [path]
             audio_urls = [f"/audio/{p.name}" for p in paths]
+            # ADR 0005: only track files inside AUDIO_DIR — never the static
+            # fallback clip (ASSETS_DIR / "audio-unavailable.m4a").
+            audio_paths = [p for p in paths if p.parent == AUDIO_DIR]
         except Exception as exc:
             print(f"[tts] error: {exc}", file=sys.stderr)
             audio_degraded = True
-    return audio_urls, audio_degraded
+    return audio_urls, audio_degraded, audio_paths
+
+
+def _evict_chat_audio(chat_id: str) -> None:
+    """Delete the previous turn's audio files for *chat_id*.
+
+    Only files whose parent is AUDIO_DIR are ever removed — the static
+    fallback clip (ASSETS_DIR / "audio-unavailable.m4a") is never touched.
+    Called before generating a new turn's audio (see ADR 0005).
+    """
+    old = _chat_audio_files.pop(chat_id, None)
+    if old:
+        for p in old:
+            if p.parent == AUDIO_DIR:
+                p.unlink(missing_ok=True)
 
 
 def _failed_response(

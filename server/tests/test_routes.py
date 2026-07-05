@@ -527,6 +527,236 @@ class TestTalkAudio:
         assert len(body["audio_urls"]) == 1
 
 
+# ── /api/talk — audio lifetime (ADR 0005) ────────────────────────────────────
+
+
+class TestTalkAudioLifetime:
+    """ADR 0005: a turn\'s audio survives until the same chat\'s next turn."""
+
+    def _file_turn(self, client, chat_id, audio_dir, tmp_path, text, audio_response="true"):
+        """Run a talk turn that produces an audio file in *audio_dir*.
+
+        Returns (response_json, audio_path) where audio_path is the file
+        the mock TTS created inside audio_dir.
+        """
+        import uuid
+        import routes.talk as talk_mod
+        from unittest.mock import AsyncMock, patch
+
+        fake_audio = audio_dir / f"{uuid.uuid4().hex}.m4a"
+        fake_audio.write_bytes(b"audio")
+        with (
+            patch.object(talk_mod, "AUDIO_DIR", audio_dir),
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value=f"reply {text}"),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(fake_audio, False)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "audio_response": audio_response,
+                    "tts_provider": "say",
+                },
+            )
+        assert r.status_code == 200
+        return r.json(), fake_audio
+
+    def test_next_turn_evicts_previous_audio(self, client, chat_id, tmp_path):
+        """Turn 1 produces audio; turn 2 produces audio → turn 1\'s file is gone."""
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+
+        body1, path1 = self._file_turn(client, chat_id, audio_dir, tmp_path, "first")
+        assert path1.exists(), "turn 1 audio should exist after turn 1"
+
+        body2, path2 = self._file_turn(client, chat_id, audio_dir, tmp_path, "second")
+        assert path2.exists(), "turn 2 audio should exist after turn 2"
+        assert not path1.exists(), "turn 1 audio should be gone after turn 2"
+
+    def test_next_turn_without_audio_still_evicts(self, client, chat_id, tmp_path):
+        """Turn 1 produces audio; turn 2 has audio_response=false → turn 1\'s file still deleted."""
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+
+        import routes.talk as talk_mod
+        from unittest.mock import AsyncMock, patch
+
+        # Turn 1 with audio
+        fake_audio1 = audio_dir / "turn1.m4a"
+        fake_audio1.write_bytes(b"audio")
+        with (
+            patch.object(talk_mod, "AUDIO_DIR", audio_dir),
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="reply first"),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(fake_audio1, False)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "first", "audio_response": "true", "tts_provider": "say"},
+            )
+        assert r.status_code == 200
+        assert fake_audio1.exists()
+
+        # Turn 2 with audio_response=false — no audio at all
+        with patch.object(talk_mod, "AUDIO_DIR", audio_dir), patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="reply second"):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "second", "audio_response": "false"},
+            )
+        assert r.status_code == 200
+        assert not fake_audio1.exists(), "turn 1 audio should be gone even though turn 2 has no audio"
+
+    def test_different_chats_independent(self, client, tmp_path):
+        """Turn 2 on chat A does not delete chat B\'s turn 1 audio."""
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+
+        import routes.talk as talk_mod
+        from unittest.mock import AsyncMock, patch
+
+        # Create two distinct chats (different project directories so they get
+        # different IDs — the API returns the same chat for the same project_dir).
+        (tmp_path / "proj_a").mkdir()
+        (tmp_path / "proj_b").mkdir()
+        r = client.post("/api/chats", json={"project_dir": "proj_a"})
+        chat_a = r.json()["id"]
+        r = client.post("/api/chats", json={"project_dir": "proj_b"})
+        chat_b = r.json()["id"]
+
+        fake_a = audio_dir / "chat_a_turn1.m4a"
+        fake_a.write_bytes(b"audio")
+        fake_b = audio_dir / "chat_b_turn1.m4a"
+        fake_b.write_bytes(b"audio")
+
+        def _turn(chat_id_, audio_path, text):
+            with (
+                patch.object(talk_mod, "AUDIO_DIR", audio_dir),
+                patch("routes.talk.run_pi", new_callable=AsyncMock, return_value=f"reply {text}"),
+                patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(audio_path, False)),
+            ):
+                return client.post(
+                    "/api/talk",
+                    data={"chat_id": chat_id_, "text": text, "audio_response": "true", "tts_provider": "say"},
+                )
+
+        # Turn 1 on both chats
+        r = _turn(chat_a, fake_a, "a-first")
+        assert r.status_code == 200
+        r = _turn(chat_b, fake_b, "b-first")
+        assert r.status_code == 200
+
+        # Turn 2 on chat A
+        fake_a2 = audio_dir / "chat_a_turn2.m4a"
+        fake_a2.write_bytes(b"audio")
+        r = _turn(chat_a, fake_a2, "a-second")
+        assert r.status_code == 200
+
+        # Chat B's turn 1 audio must still be intact
+        assert not fake_a.exists(), "chat A turn 1 audio should be gone"
+        assert fake_b.exists(), "chat B turn 1 audio should survive"
+
+    def test_static_fallback_never_deleted(self, client, chat_id, tmp_path):
+        """A turn whose audio degraded to the static clip does NOT result in audio-unavailable.m4a being deleted, even after more turns."""
+        import tts as tts_mod_t
+
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+
+        import routes.talk as talk_mod
+        from unittest.mock import AsyncMock, patch
+
+        static_path = tts_mod_t._STATIC_FALLBACK
+
+        # Turn 1 — degraded to static clip
+        with (
+            patch.object(talk_mod, "AUDIO_DIR", audio_dir),
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="Hello!"),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(static_path, True)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "hi", "audio_response": "true", "tts_provider": "say"},
+            )
+        assert r.status_code == 200
+        assert static_path.exists(), "static fallback must exist (it's a real project file)"
+
+        # Turn 2 — another turn on the same chat (normal audio this time)
+        fake_audio = audio_dir / "turn2.m4a"
+        fake_audio.write_bytes(b"audio")
+        with (
+            patch.object(talk_mod, "AUDIO_DIR", audio_dir),
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="reply2"),
+            patch("routes.talk.tts_mod.synthesize", new_callable=AsyncMock, return_value=(fake_audio, False)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "second", "audio_response": "true", "tts_provider": "say"},
+            )
+        assert r.status_code == 200
+
+        # Static fallback must never have been deleted
+        assert static_path.exists(), "static fallback must still exist after subsequent turns"
+
+    def test_first_turn_no_audio_does_not_crash(self, client, chat_id):
+        """A turn with audio_response=false on a fresh chat does not crash when there's nothing to evict."""
+        from unittest.mock import AsyncMock, patch
+
+        import routes.talk as talk_mod
+
+        # No _chat_audio_files entry exists for this chat — must not crash
+        with patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="ok"):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "hello", "audio_response": "false"},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["reply"] == "ok"
+
+    def test_chunked_audio_eviction(self, client, chat_id, tmp_path):
+        """Turn with chunked audio — all chunks from turn 1 evicted by turn 2."""
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+
+        import routes.talk as talk_mod
+        from unittest.mock import AsyncMock, patch
+
+        # Turn 1 with 3 chunked audio files
+        chunks1 = [audio_dir / f"t1_c{i}.m4a" for i in range(3)]
+        for c in chunks1:
+            c.write_bytes(b"chunk")
+        with (
+            patch.object(talk_mod, "AUDIO_DIR", audio_dir),
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="One. Two. Three."),
+            patch("routes.talk.tts_mod.synthesize_chunked", new_callable=AsyncMock, return_value=(chunks1, False)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "first", "audio_response": "true", "chunked_audio": "true"},
+            )
+        assert r.status_code == 200
+        assert all(c.exists() for c in chunks1), "all turn 1 chunks should exist after turn 1"
+
+        # Turn 2 with chunked audio
+        chunks2 = [audio_dir / f"t2_c{i}.m4a" for i in range(2)]
+        for c in chunks2:
+            c.write_bytes(b"chunk2")
+        with (
+            patch.object(talk_mod, "AUDIO_DIR", audio_dir),
+            patch("routes.talk.run_pi", new_callable=AsyncMock, return_value="Four. Five."),
+            patch("routes.talk.tts_mod.synthesize_chunked", new_callable=AsyncMock, return_value=(chunks2, False)),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "second", "audio_response": "true", "chunked_audio": "true"},
+            )
+        assert r.status_code == 200
+
+        # Turn 1 chunks gone, turn 2 chunks present
+        assert all(not c.exists() for c in chunks1), "all turn 1 chunks should be evicted"
+        assert all(c.exists() for c in chunks2), "all turn 2 chunks should survive"
+
+
 # ── /api/talk — save path & file creation ────────────────────────────────────
 
 
