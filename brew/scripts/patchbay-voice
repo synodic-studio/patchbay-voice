@@ -8,7 +8,7 @@ PB_LIBEXEC="__LIBEXEC__"
 PB_VERSION="__VERSION__"
 
 _discover_urls() {
-    local port="${VOICE_PORT:-8800}"
+    local port="${VOICE_PORT:-31552}"
     echo "━━━ Patchbay Voice Server ━━━"
     echo ""
     echo "Connect your iOS app to one of these URLs:"
@@ -29,7 +29,7 @@ case "${1:-start}" in
         _discover_urls
         exec uv run uvicorn app:app \
             --host "${VOICE_HOST:-127.0.0.1}" \
-            --port "${VOICE_PORT:-8800}" \
+            --port "${VOICE_PORT:-31552}" \
             --log-level info
         ;;
     status)

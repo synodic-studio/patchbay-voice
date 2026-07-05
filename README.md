@@ -48,12 +48,12 @@ cd server
 ./run.sh
 ```
 
-Runs on port 8800 by default. Configure with environment variables:
+Runs on port 31552 by default. Configure with environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
 | `VOICE_HOST` | `127.0.0.1` | Bind address |
-| `VOICE_PORT` | `8800` | Port |
+| `VOICE_PORT` | `31552` | Port |
 | `VOICE_AUTH_TOKEN` | *(empty — auth off)* | Optional bearer token required on `/api/*` when set |
 | `PI_BIN` | `pi` | Path to pi binary |
 | `PI_PROVIDER` | `litellm` | pi model provider |
@@ -116,7 +116,7 @@ pi loads the extension automatically via `--extension` on every invocation.
 
 A single-file HTML/JS/CSS app at `web/index.html`, served by the server at `GET /`. No build step. Mirrors the iOS app: sessions list, talk screen with hold-to-talk mic, keyboard fallback, settings panel. Works in any modern browser.
 
-> **Microphone requires a secure context.** The hold-to-talk feature uses `getUserMedia`, which browsers only allow on `https://` or `localhost`. The server serves plain `http://<lan-or-tailscale-ip>:8800`, so voice input will not work over LAN or Tailscale unless you front the server with HTTPS (e.g. `tailscale serve`). Text input always works.
+> **Microphone requires a secure context.** The hold-to-talk feature uses `getUserMedia`, which browsers only allow on `https://` or `localhost`. The server serves plain `http://<lan-or-tailscale-ip>:31552`, so voice input will not work over LAN or Tailscale unless you front the server with HTTPS (e.g. `tailscale serve`). Text input always works.
 
 ## iOS App
 

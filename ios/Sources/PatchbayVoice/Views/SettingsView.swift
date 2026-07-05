@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("serverURL") private var serverURL = "http://localhost:8800"
+    @AppStorage("serverURL") private var serverURL = "http://localhost:31552"
     @AppStorage("serverToken") private var serverToken = ""
     @AppStorage("audioResponseEnabled") private var audioResponseEnabled = true
     @AppStorage("ttsProvider") private var ttsProvider = "say"

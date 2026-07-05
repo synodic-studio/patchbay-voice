@@ -27,5 +27,5 @@ COPY web/ /app/web/
 # On Linux the local-TTS auto-detect picks espeak-ng; override with
 # LOCAL_TTS_ENGINE=piper (and PIPER_MODEL=/path/to/voice.onnx) for neural TTS.
 ENV VOICE_HOST=0.0.0.0
-EXPOSE 8800
-CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8800"]
+EXPOSE 31552
+CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "31552"]

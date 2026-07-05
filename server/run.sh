@@ -13,4 +13,4 @@ if [[ -z "$UV_BIN" || ! -x "$UV_BIN" ]]; then
     echo "uv not found" >&2; sleep 30; exit 1
 fi
 
-exec "$UV_BIN" run uvicorn app:app --host "${VOICE_HOST:-127.0.0.1}" --port "${VOICE_PORT:-8800}"
+exec "$UV_BIN" run uvicorn app:app --host "${VOICE_HOST:-127.0.0.1}" --port "${VOICE_PORT:-31552}"

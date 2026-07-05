@@ -15,7 +15,7 @@ def _pass_show(name: str) -> str:
 
 
 HOST = environ.get("VOICE_HOST", "127.0.0.1")
-PORT = int(environ.get("VOICE_PORT", "8800"))
+PORT = int(environ.get("VOICE_PORT", "31552"))
 
 # Optional shared secret. When set, all /api/* requests must carry
 # "Authorization: Bearer <token>". Empty (the default) disables auth.
