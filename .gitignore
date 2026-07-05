@@ -13,3 +13,6 @@ vendor/
 
 # fastlane runtime logs
 ios/fastlane/report.xml
+
+# pi's local runtime state (retain-queue, cursors — not project config)
+.pi/
