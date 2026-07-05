@@ -3,7 +3,7 @@ import SwiftUI
 struct ModelSectionView: View {
     @AppStorage("selectedModelAlias") private var selectedAlias = "small"
     @AppStorage("hiddenModelAliases") private var hiddenRaw = ""
-    @AppStorage("customModelAliases") private var customRaw = ""
+    @AppStorage("customModelAliases") private var customRaw = LiteLLMModel.defaultAliases
     @State private var newAlias = ""
     @State private var showHidden = false
 
@@ -22,7 +22,9 @@ struct ModelSectionView: View {
             .map { LiteLLMModel(id: $0, name: $0) }
     }
 
-    private var allModels: [LiteLLMModel] { LiteLLMModel.builtIn + custom }
+    // The model list is entirely settings-driven (seeded with defaults), not
+    // hardcoded. Fall back to defaults only if the user has emptied the list.
+    private var allModels: [LiteLLMModel] { custom.isEmpty ? LiteLLMModel.defaults : custom }
     private var visible: [LiteLLMModel] { allModels.filter { !hidden.contains($0.id) } }
     private var hiddenModels: [LiteLLMModel] { allModels.filter { hidden.contains($0.id) } }
 
