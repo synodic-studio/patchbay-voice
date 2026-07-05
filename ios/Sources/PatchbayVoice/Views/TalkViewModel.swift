@@ -45,7 +45,7 @@ final class TalkViewModel {
         let local = Set(turns.map { $0.transcript + "|" + $0.reply })
         let missing = serverTurns
             .filter { !local.contains($0.transcript + "|" + $0.reply) }
-            .map { TurnItem(transcript: $0.transcript, reply: $0.reply) }
+            .map { TurnItem(transcript: $0.transcript, reply: $0.reply, failed: $0.failed) }
         guard !missing.isEmpty else { return }
         turns.append(contentsOf: missing)
         if let data = try? JSONEncoder().encode(turns) {
@@ -118,7 +118,7 @@ extension TalkViewModel {
         if isOnlyTurnInFlight { startStatusTimer() }
         do {
             let response = try await client.sendTurn(chatID: chat.id, audioData: audio, settings: .current)
-            _appendTurn(TurnItem(transcript: response.transcript, reply: response.reply), chat: chat)
+            _appendTurn(TurnItem(transcript: response.transcript, reply: response.reply, failed: response.failed), chat: chat)
             await _playResponse(response, client: client)
         } catch {
             errorMessage = error.localizedDescription
@@ -133,7 +133,7 @@ extension TalkViewModel {
         if isOnlyTurnInFlight { startStatusTimer() }
         do {
             let response = try await client.sendTextTurn(chatID: chat.id, text: text, settings: .current)
-            _appendTurn(TurnItem(transcript: text, reply: response.reply), chat: chat)
+            _appendTurn(TurnItem(transcript: text, reply: response.reply, failed: response.failed), chat: chat)
             await _playResponse(response, client: client)
         } catch {
             errorMessage = error.localizedDescription

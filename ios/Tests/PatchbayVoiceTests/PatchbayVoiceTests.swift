@@ -70,6 +70,38 @@ struct TurnResponseTests {
             _ = try JSONDecoder().decode(TurnResponse.self, from: Data("{}".utf8))
         }
     }
+
+    @Test
+    func decodesFailedTrue() throws {
+        let json = #"{"transcript":"q","reply":"a","audio_url":null,"audio_urls":[],"failed":true,"audio_degraded":false}"#
+        let r = try JSONDecoder().decode(TurnResponse.self, from: Data(json.utf8))
+        #expect(r.failed)
+        #expect(!r.audioDegraded)
+    }
+
+    @Test
+    func decodesAudioDegradedTrue() throws {
+        let json = #"{"transcript":"q","reply":"a","audio_url":null,"audio_urls":[],"failed":false,"audio_degraded":true}"#
+        let r = try JSONDecoder().decode(TurnResponse.self, from: Data(json.utf8))
+        #expect(!r.failed)
+        #expect(r.audioDegraded)
+    }
+
+    @Test
+    func decodesDefaultsWhenMissing() throws {
+        // Server may add these fields later — older responses without them must still decode.
+        let json = #"{"transcript":"q","reply":"a","audio_url":null,"audio_urls":[]}"#
+        let r = try JSONDecoder().decode(TurnResponse.self, from: Data(json.utf8))
+        #expect(!r.failed)
+        #expect(!r.audioDegraded)
+    }
+
+    @Test
+    func memberwiseInitDefaults() {
+        let r = TurnResponse(transcript: "q", reply: "a")
+        #expect(!r.failed)
+        #expect(!r.audioDegraded)
+    }
 }
 
 // MARK: - ServerError
@@ -105,6 +137,28 @@ struct TurnItemTests {
         let t = TurnItem(transcript: "", reply: "response")
         #expect(t.transcript.isEmpty)
         #expect(t.reply == "response")
+    }
+
+    @Test
+    func failedDefaultsToFalse() {
+        let t = TurnItem(transcript: "q", reply: "a")
+        #expect(!t.failed)
+    }
+
+    @Test
+    func failedCanBeSetTrue() {
+        let t = TurnItem(transcript: "q", reply: "a", failed: true)
+        #expect(t.failed)
+    }
+
+    @Test
+    func codableRoundTrip() throws {
+        let original = TurnItem(transcript: "q", reply: "a", failed: true)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(TurnItem.self, from: data)
+        #expect(decoded.failed)
+        #expect(decoded.transcript == "q")
+        #expect(decoded.reply == "a")
     }
 }
 

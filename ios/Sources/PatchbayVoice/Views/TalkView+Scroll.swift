@@ -58,7 +58,11 @@ extension TalkView {
     func bubbleRow(_ turn: TurnItem) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             transcriptBubble(turn.transcript)
-            replyBubble(text: turn.reply)
+            if turn.failed {
+                failedReplyBubble(text: turn.reply)
+            } else {
+                replyBubble(text: turn.reply)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 4)
@@ -91,6 +95,27 @@ extension TalkView {
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(Color.white.opacity(0.06), lineWidth: 1),
                 )
+            Spacer(minLength: 64)
+        }
+    }
+
+    func failedReplyBubble(text: String) -> some View {
+        HStack {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(Color.orange.opacity(0.7))
+                Text(text)
+                    .font(.callout)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color.orange.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.orange.opacity(0.25), lineWidth: 1),
+            )
             Spacer(minLength: 64)
         }
     }

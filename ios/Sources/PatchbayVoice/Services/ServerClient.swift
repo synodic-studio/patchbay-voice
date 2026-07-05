@@ -159,12 +159,14 @@ struct ServerTurn: Decodable, Sendable {
     let transcript: String
     let reply: String
     let createdAt: Double
+    let failed: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
         case transcript
         case reply
         case createdAt = "created_at"
+        case failed
     }
 }
 
