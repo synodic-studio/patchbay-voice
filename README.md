@@ -1,6 +1,14 @@
 # Patchbay Voice
 
-Voice interface to [pi](https://github.com/badlogic/pi-mono), a multi-model AI coding agent. Speak into your phone (or browser), pi codes, it speaks back.
+Voice interface to [pi](https://github.com/earendil-works/pi), a multi-model AI coding agent. Speak into your phone (or browser), pi codes, it speaks back.
+
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg) ![Platform: iOS 17+ · macOS server](https://img.shields.io/badge/platform-iOS%2017%2B%20%C2%B7%20macOS%20server-lightgrey.svg)
+
+<p align="center">
+  <img src="docs/screenshots/talk.png" width="30%" alt="Talk screen: a spoken conversation with the coding agent" />
+  <img src="docs/screenshots/sessions.png" width="30%" alt="Sessions list, one per repository" />
+  <img src="docs/screenshots/settings.png" width="30%" alt="Settings: model, voice, and server" />
+</p>
 
 ## What it is
 
@@ -9,6 +17,15 @@ A two-part system: an iOS app and a local server that runs on the same machine a
 You hold a button, say what you want built. The server transcribes it with faster-whisper, sends it to pi (via a custom extension bundled in the repo), and streams the response back as audio. The whole exchange is stored per-session so context accumulates across turns.
 
 Two clients ship with the repo: a native iOS app and a single-file web client served directly by the server at `GET /`. Both share the same API.
+
+## Design: a turn always comes back with something audible
+
+A voice interface is used when you are *not* looking at the screen — walking, hands busy, phone in a pocket. That single fact changes what a failure is allowed to do: a silent app leaves you waiting on the sidewalk for a reply that never comes, with no way to tell it broke. So the server is built on one rule: **every turn returns something you can hear.** The decisions that follow from it were easy to leave implicit until voice forced them, so they are written down as [architecture decision records](docs/adr/) and tested against, not buried in the code:
+
+- **[Audio is best-effort, never required](docs/adr/0001-tts-fallback-chain.md).** The transcript and reply text are the permanent record; spoken audio is a disposable rendering. Synthesis runs a one-way fallback chain (Google Cloud TTS → local `say`/`espeak`/`piper` → a pre-recorded "audio unavailable" clip) and flags when it had to fall back.
+- **[Failures speak](docs/adr/0003-failed-turn-persistence-and-audio.md).** If pi times out or transcription fails, the turn is still saved and a short spoken notice comes back through that same chain. The technical detail stays in the turn's text; what you *hear* is a plain sentence.
+- **[Nothing you say is dropped](docs/adr/0002-turn-submission-queue.md).** Talking while a previous turn is still running used to block or discard the earlier message. Now every submission is queued server-side in strict FIFO order and answered as its own turn.
+- **[Audio is ephemeral on purpose](docs/adr/0005-audio-lifetime.md).** A turn's audio lives only until the next turn on that chat, then it's deleted. This is a live conversation, not a podcast archive.
 
 ## Architecture
 
@@ -27,7 +44,7 @@ Sessions map one-to-one to directories under `~/Developer`. Each session carries
 ## System Requirements
 
 - **macOS** (server runs on your Mac)
-- **[pi](https://github.com/badlogic/pi-mono)** coding agent in `$PATH` (`pi` binary)
+- **[pi](https://github.com/earendil-works/pi)** coding agent in `$PATH` (`pi` binary)
 - **[uv](https://github.com/astral-sh/uv)** for Python dependency management
 - **[Node.js](https://nodejs.org)** (required by pi to load the TypeScript extension)
 - **faster-whisper** (bundled via uv — no manual install)
@@ -120,9 +137,17 @@ It installs Ollama if needed, pulls the model, registers an `ollama` provider in
 
 ## The pi Extension
 
-The file `pi/tools.ts` is a pi extension that registers a single `write_file` tool. It constrains all file saves to a configured directory (`VOICE_SAVE_PATH` env var, defaulting to `docs/patchbay/` inside the session's project dir). This is the only tool pi has access to — no shell, no git, no arbitrary writes.
+The file [`pi/tools.ts`](pi/tools.ts) is a pi extension that replaces pi's built-in tools entirely. pi runs with `--no-builtin-tools --no-extensions --no-skills`, so the agent can touch the project *only* through the twelve parameterized, injection-safe tools this extension registers:
 
-pi loads the extension automatically via `--extension` on every invocation.
+| Group | Tools |
+| --- | --- |
+| Read / search | `read_file`, `grep_search`, `glob_find`, `list_dir`, `tree` |
+| Git history | `git_log`, `git_show`, `git_blame`, `git_diff`, `git_branch`, `git_show_file` |
+| Write | `write_file` |
+
+Every tool takes explicit arguments and shells out through argv arrays (never a shell string), so metacharacters in a transcribed instruction like `&&`, `;`, or `$()` are inert. Reads and git inspection are scoped inside the project directory; `write_file` is constrained to a configured save path (`VOICE_SAVE_PATH`, default `docs/patchbay/`) *at the tool layer*, not just in the prompt. There is no shell tool and no way to write outside that path.
+
+pi loads the extension automatically via `--extension` on every invocation. It has a regression suite ([`pi/tools.test.mts`](pi/tools.test.mts), `node --test`) that pins the full tool set and the current pi API shape — see [`pi/README.md`](pi/README.md).
 
 ## Web Client
 
@@ -132,7 +157,7 @@ A single-file HTML/JS/CSS app at `web/index.html`, served by the server at `GET 
 
 ## iOS App
 
-Built with SwiftUI, targeting iOS 18+. Managed with [Tuist](https://tuist.io).
+Built with SwiftUI, targeting iOS 17+. Managed with [Tuist](https://tuist.io).
 
 ```bash
 tuist generate --no-open
@@ -149,10 +174,30 @@ fastlane beta         # build + upload + add to internal testers
 ## Features
 
 - **Voice input** — hold the mic button, release to send; or switch to keyboard mode
-- **TTS responses** — spoken replies via Google Cloud or macOS say, toggleable per-session
+- **TTS responses** — spoken replies via Google Cloud, macOS `say`, or the local `espeak`/`piper` engines, toggleable per-session
 - **Speaking rate** — adjustable 0.5×–2.0× slider in Settings, applied to both providers
 - **Sessions** — one per repo, persisted across app launches; swipe to reset or delete
 - **Turn history** — stored locally in UserDefaults until you reset the session
 - **Write directory** — server constrains pi to a single save path per project
+- **Auto-commit / auto-push** — optionally commit and push saved notes to a side branch, each toggle enabled only when the repo actually supports it (a Git repo for commit, a remote for push), so neither is ever a silent no-op
 - **Dark graphite UI** — designed around the Patchbay Voice design system (1A Graphite)
 - **Model switching** — any LiteLLM alias, switchable from Settings
+
+## Testing
+
+```bash
+cd server && uv run pytest          # 138 server tests
+node --test pi/tools.test.mts       # pi extension regression suite
+cd ios && tuist test                # iOS unit + UI tests
+```
+
+The server suite covers the turn state machine, the TTS fallback chain, the FIFO
+queue, failed-turn persistence, and the auto-commit/push git plumbing (against
+real throwaway repos). The pi extension has its own suite because it is loaded by
+pi at runtime, not by Python — it pins the full tool set and the pi API shape so
+the extension can't silently regress. The design decisions above are backed by
+the [ADRs](docs/adr/) and tested against them.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
