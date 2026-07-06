@@ -8,7 +8,7 @@ import sys
 from fastapi import HTTPException
 
 from chats import Chat, save_chats
-from config import DEVELOPER_DIR, EXTENSION_PATH, PI_BIN, PI_MODEL, PI_PROVIDER
+from config import DEVELOPER_DIR, EXTENSION_PATH, FORCE_MODEL, PI_BIN, PI_MODEL, PI_PROVIDER
 
 PI_TIMEOUT = 120  # seconds
 
@@ -117,8 +117,9 @@ async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/
             "--provider",
             PI_PROVIDER,
         ]
-        # Thread the requested model (or fall back to the configured default)
-        active_model = model if model else PI_MODEL
+        # FORCE_MODEL pins the model server-side (demo / locked-down servers);
+        # otherwise use the client's requested model, then the configured default.
+        active_model = FORCE_MODEL or model or PI_MODEL
         cmd.extend(["--model", active_model])
 
         if chat.pi_session_id:

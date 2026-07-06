@@ -37,6 +37,10 @@ WHISPER_INITIAL_PROMPT = (
 PI_BIN = shutil.which(environ.get("PI_BIN", "pi"))
 PI_PROVIDER = environ.get("PI_PROVIDER", "litellm")
 PI_MODEL = environ.get("PI_MODEL", "small")
+# When set, forces every turn to this model regardless of what the client
+# requests. Lets a locked-down or demo server pin one model even though the
+# app always sends its own picker value (default "small").
+FORCE_MODEL = environ.get("VOICE_FORCE_MODEL", "").strip()
 
 DEVELOPER_DIR = Path(environ.get("DEVELOPER_DIR", "~/Developer")).expanduser()
 CHATS_FILE = Path(environ.get("CHATS_FILE", "~/.voice-demo-chats.json").strip()).expanduser()
