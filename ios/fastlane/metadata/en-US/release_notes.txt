@@ -1,0 +1,1 @@
+First release of Patchbay Voice. Talk to your AI coding agent from your phone, backed by a server you run on your own Mac.

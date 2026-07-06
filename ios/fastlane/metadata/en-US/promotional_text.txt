@@ -1,0 +1,1 @@
+Hold a button, describe what you want built, and hear your AI coding agent reply. A voice interface to pi, backed by a lightweight server on your own Mac.
