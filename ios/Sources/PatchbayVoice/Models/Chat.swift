@@ -6,6 +6,8 @@ struct Chat: Identifiable, Codable, Hashable, Sendable {
     let projectDir: String
     let createdAt: Double
     let lastActive: Double
+    var canCommit: Bool? = nil
+    var canPush: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -13,6 +15,8 @@ struct Chat: Identifiable, Codable, Hashable, Sendable {
         case projectDir = "project_dir"
         case createdAt = "created_at"
         case lastActive = "last_active"
+        case canCommit = "can_commit"
+        case canPush = "can_push"
     }
 }
 

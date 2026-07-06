@@ -1,16 +1,49 @@
 from __future__ import annotations
 
+import subprocess
+
 from fastapi import APIRouter, HTTPException
 
 from chats import _chats, chat_json, create_chat, delete_chat, get_turns, save_chats
+from config import DEVELOPER_DIR
 
 router = APIRouter()
+
+
+def _git_capability(project_dir: str) -> dict:
+    """Cheap, no-network check of what auto-commit/push can do for a project.
+
+    can_commit → the project is a git repo (auto-commit works locally).
+    can_push   → it's a git repo AND has a remote configured. The app uses
+    these to enable/disable the toggles so neither is ever a silent no-op.
+    """
+    base = str((DEVELOPER_DIR / project_dir))
+    try:
+        is_repo = (
+            subprocess.run(
+                ["git", "rev-parse", "--is-inside-work-tree"],
+                cwd=base, capture_output=True, text=True, timeout=5,
+            ).returncode == 0
+        )
+    except Exception:
+        is_repo = False
+    has_remote = False
+    if is_repo:
+        try:
+            has_remote = bool(
+                subprocess.run(
+                    ["git", "remote"], cwd=base, capture_output=True, text=True, timeout=5,
+                ).stdout.strip()
+            )
+        except Exception:
+            has_remote = False
+    return {"can_commit": is_repo, "can_push": is_repo and has_remote}
 
 
 @router.get("/api/chats")
 def list_chats():
     ordered = sorted(_chats.values(), key=lambda c: c.last_active, reverse=True)
-    return {"chats": [chat_json(c) for c in ordered]}
+    return {"chats": [{**chat_json(c), **_git_capability(c.project_dir)} for c in ordered]}
 
 
 @router.post("/api/chats")

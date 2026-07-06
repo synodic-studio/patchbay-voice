@@ -52,6 +52,7 @@ async def talk(
     save_path: str = Form(default="docs/patchbay/"),
     auto_commit: str = Form(default="false"),
     auto_commit_branch: str = Form(default="patchbay"),
+    auto_push: str = Form(default="false"),
     create_agents_md: str = Form(default="false"),
     create_claude_md: str = Form(default="false"),
 ):
@@ -68,6 +69,7 @@ async def talk(
         want_audio = _truthy(audio_response)
         want_chunked = _truthy(chunked_audio)
         want_commit = _truthy(auto_commit)
+        want_push = _truthy(auto_push)
 
         # Validate and resolve save_path; default when empty
         clean_save = save_path.strip().lstrip("/")
@@ -128,8 +130,10 @@ async def talk(
         # ASR failure — persist Failed turn with placeholder, speak generic notice
         if failed:
             add_turn(chat.id, transcript, reply, failed=True)
-            if want_commit:
+            if want_commit or want_push:
                 _git_commit(project_dir, clean_save, branch=auto_commit_branch)
+                if want_push:
+                    _spawn_push(project_dir, auto_commit_branch)
             audio_urls, audio_degraded, audio_paths = await _synthesize_audio(
                 GENERIC_FAILURE_NOTICE, want_audio, want_chunked, tts_provider, speaking_rate
             )
@@ -153,8 +157,10 @@ async def talk(
         # pi failure — persist Failed turn with real transcript, speak generic notice
         if failed:
             add_turn(chat.id, transcript, reply, failed=True)
-            if want_commit:
+            if want_commit or want_push:
                 _git_commit(project_dir, clean_save, branch=auto_commit_branch)
+                if want_push:
+                    _spawn_push(project_dir, auto_commit_branch)
             audio_urls, audio_degraded, audio_paths = await _synthesize_audio(
                 GENERIC_FAILURE_NOTICE, want_audio, want_chunked, tts_provider, speaking_rate
             )
@@ -167,8 +173,10 @@ async def talk(
         if reply and reply != "(no response)":
             add_turn(chat.id, transcript, reply)
 
-        if want_commit:
+        if want_commit or want_push:
             _git_commit(project_dir, clean_save, branch=auto_commit_branch)
+            if want_push:
+                _spawn_push(project_dir, auto_commit_branch)
 
         # TTS — synthesize never raises for provider failures, so the
         # try/except here is only a safety net for truly unexpected bugs.
@@ -327,3 +335,38 @@ def _git_commit(project_dir: Path, save_path: str, branch: str = "patchbay") -> 
     finally:
         if tmp_index:
             Path(tmp_index).unlink(missing_ok=True)
+
+
+_push_tasks: set = set()
+
+
+def _spawn_push(project_dir: Path, branch: str) -> None:
+    """Fire-and-forget the push so it never delays the spoken reply. Safe to
+    background because the app only offers auto-push when can_push is true
+    (a git repo with a remote)."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    task = loop.create_task(asyncio.to_thread(_git_push, project_dir, branch))
+    _push_tasks.add(task)
+    task.add_done_callback(_push_tasks.discard)
+
+
+def _git_push(project_dir: Path, branch: str = "patchbay") -> None:
+    """Push *branch* to its remote (best-effort). No-op if there's no remote."""
+    try:
+        remotes = subprocess.run(
+            ["git", "remote"], cwd=str(project_dir), capture_output=True, text=True, timeout=10,
+        ).stdout.split()
+        if not remotes:
+            return
+        target = "origin" if "origin" in remotes else remotes[0]
+        result = subprocess.run(
+            ["git", "push", target, f"refs/heads/{branch}:refs/heads/{branch}"],
+            cwd=str(project_dir), capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            print(f"[git] push {branch} -> {target} failed: {result.stderr.strip()}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[git] push {branch} failed: {exc}", file=sys.stderr)

@@ -143,6 +143,11 @@ struct ServerClient: Sendable {
         )
         if settings.autoCommit {
             field(into: &body, boundary: boundary, name: "auto_commit", value: "true")
+        }
+        if settings.autoPush {
+            field(into: &body, boundary: boundary, name: "auto_push", value: "true")
+        }
+        if settings.autoCommit || settings.autoPush {
             field(into: &body, boundary: boundary, name: "auto_commit_branch", value: settings.autoCommitBranch)
         }
         if settings.createAgentsMD { field(into: &body, boundary: boundary, name: "create_agents_md", value: "true") }

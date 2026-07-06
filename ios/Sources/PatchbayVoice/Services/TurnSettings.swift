@@ -8,6 +8,7 @@ struct TurnSettings: Sendable {
     let speakingRate: Double
     let autoCommit: Bool
     let autoCommitBranch: String
+    let autoPush: Bool
     let createAgentsMD: Bool
     let createClaudeMD: Bool
 
@@ -25,6 +26,7 @@ struct TurnSettings: Sendable {
             speakingRate: rate,
             autoCommit: defaults.bool(forKey: "autoCommitEnabled"),
             autoCommitBranch: defaults.string(forKey: "autoCommitBranch") ?? "patchbay",
+            autoPush: defaults.bool(forKey: "autoPushEnabled"),
             createAgentsMD: defaults.bool(forKey: "createAgentsMD"),
             createClaudeMD: defaults.bool(forKey: "createClaudeMD"),
         )
