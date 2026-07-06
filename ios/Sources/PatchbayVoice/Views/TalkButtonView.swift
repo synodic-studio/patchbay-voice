@@ -48,18 +48,21 @@ struct TalkButtonView: View {
 
     private var micCircle: some View {
         ZStack {
-            if viewModel.isCapturing {
-                Circle()
-                    .fill(Color.blueAccent.opacity(0.20))
-                    .frame(width: 100, height: 100)
-            }
+            // Capture ring lives inside the fixed footprint, so recording changes
+            // the button's appearance (red + ring + waveform) without resizing it
+            // and pushing the whole bottom bar around.
+            Circle()
+                .stroke(Color.red.opacity(0.40), lineWidth: 5)
+                .frame(width: 78, height: 78)
+                .opacity(viewModel.isCapturing ? 1 : 0)
             Circle()
                 .fill(viewModel.isCapturing ? Color.red : Color.blueAccent)
-                .frame(width: 78, height: 78)
+                .frame(width: 64, height: 64)
             Image(systemName: viewModel.isCapturing ? "waveform" : "mic.fill")
-                .font(.system(size: 28))
+                .font(.system(size: 25))
                 .foregroundStyle(.white)
         }
+        .frame(width: 78, height: 78)
     }
 
     private var isMockCapture: Bool {

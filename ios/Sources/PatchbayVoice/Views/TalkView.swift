@@ -41,10 +41,11 @@ extension TalkView {
                 .frame(height: 1)
             bottomBarContents
                 .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 28)
-                .background(Color.graphiteCard)
+                .padding(.vertical, 10)
         }
+        // Card fills down through the home-indicator safe area so there's no
+        // color seam; the content above stays clear of the indicator.
+        .background(Color.graphiteCard.ignoresSafeArea(edges: .bottom))
     }
 
     var bottomBarContents: some View {

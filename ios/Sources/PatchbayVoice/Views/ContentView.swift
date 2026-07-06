@@ -12,7 +12,7 @@ struct ContentView: View {
                 .toolbar { toolbarContent }
         }
         .sheet(isPresented: $showSessions) { ChatListView() }
-        .sheet(isPresented: $showSettings) {
+        .sheet(isPresented: $showSettings, onDismiss: { Task { await chatManager.load() } }) {
             SettingsView(
                 canCommit: chatManager.currentChat?.canCommit ?? false,
                 canPush: chatManager.currentChat?.canPush ?? false,
