@@ -45,6 +45,7 @@ final class ChatManager {
                 ),
             ]
             currentChatID = chats.first?.id
+            _seedMockTurns()
             return
         }
         do {
@@ -56,6 +57,30 @@ final class ChatManager {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Seed a fresh, varied conversation for the mock chat used by the
+    /// screenshot UI test. Overwrites any turns persisted by a previous run so
+    /// App Store captures show a curated exchange, not accumulated test filler.
+    private func _seedMockTurns() {
+        let history = [
+            TurnItem(
+                transcript: "What does this project do?",
+                reply: "It's a relay that forwards messages from Telegram to a coding agent and streams the"
+                    + " replies back. The core is a FastAPI webhook and a small queue that keeps requests in order.",
+            ),
+            TurnItem(
+                transcript: "Add a loading spinner to the submit button while it waits.",
+                reply: "Done. The submit button now shows a spinner and disables itself while a request is in"
+                    + " flight, then re-enables once the reply comes back.",
+            ),
+        ]
+        if let data = try? JSONEncoder().encode(history) {
+            UserDefaults.standard.set(data, forKey: "turns.mock-patchbay-relay")
+        }
+        // Keep the other mock sessions empty so their rows read cleanly.
+        UserDefaults.standard.removeObject(forKey: "turns.mock-synodic-co")
+        UserDefaults.standard.removeObject(forKey: "turns.mock-podwash")
     }
 
     func switchOrCreate(projectDir: String) async {

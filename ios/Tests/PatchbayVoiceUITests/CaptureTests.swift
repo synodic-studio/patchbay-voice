@@ -10,7 +10,10 @@ final class CaptureTests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["--uitesting-mock-turn"]
+        // -serverURL sets the NSArgumentDomain, which @AppStorage reads first —
+        // so the Settings capture shows the real default port, not whatever a
+        // prior run persisted in the simulator.
+        app.launchArguments = ["--uitesting-mock-turn", "-serverURL", "http://localhost:31552"]
         app.launch()
     }
 

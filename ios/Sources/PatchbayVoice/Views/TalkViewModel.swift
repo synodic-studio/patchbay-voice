@@ -76,9 +76,8 @@ final class TalkViewModel {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             _appendTurn(TurnItem(
                 transcript: "What changed in the last commit?",
-                reply: "Added the UITest target and accessibility identifiers."
-                    + " Sessions button, settings button, and session rows"
-                    + " now have stable IDs so headless screenshot capture runs fully automated.",
+                reply: "I wrapped the webhook call in a retry with backoff, so a flaky network gets a few"
+                    + " attempts, from about a second up to thirty, before it gives up.",
             ), chat: chat)
             inFlightCount -= 1
         }
