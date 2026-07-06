@@ -6,8 +6,8 @@ struct Chat: Identifiable, Codable, Hashable, Sendable {
     let projectDir: String
     let createdAt: Double
     let lastActive: Double
-    var canCommit: Bool? = nil
-    var canPush: Bool? = nil
+    var canCommit: Bool?
+    var canPush: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
