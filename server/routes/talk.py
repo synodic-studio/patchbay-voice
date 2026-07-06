@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 import asr as asr_mod
 import tts as tts_mod
 from chats import _chats, add_turn, save_chats
-from config import AUDIO_DIR, DEVELOPER_DIR
+from config import AUDIO_DIR, DEVELOPER_DIR, FORCE_TTS
 from pi_runner import run_pi
 
 router = APIRouter()
@@ -59,6 +59,10 @@ async def talk(
     chat = _chats.get(chat_id)
     if not chat:
         raise HTTPException(404, "Chat not found")
+
+    # A server may pin the TTS provider (the demo forces Google for a good voice)
+    if FORCE_TTS:
+        tts_provider = FORCE_TTS
 
     # Serialize overlapping turns on the same chat
     if chat_id not in _talk_locks:

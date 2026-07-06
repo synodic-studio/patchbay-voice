@@ -56,9 +56,14 @@ PIPER_MODEL = environ.get("PIPER_MODEL", "").strip()  # path to a piper .onnx vo
 ESPEAK_BIN = environ.get("ESPEAK_BIN", "espeak-ng")
 FFMPEG_BIN = environ.get("FFMPEG_BIN", "ffmpeg")
 
-# Google TTS service account: env override works as before, but the pass lookup
-# is lazy — only invoked the first time Google TTS actually needs it.
+# Google TTS service account. Resolution order (all lazy — only read the first
+# time Google TTS is actually used):
+#   1. GOOGLE_TTS_SERVICE_ACCOUNT_JSON — the JSON inline (env)
+#   2. GOOGLE_TTS_SERVICE_ACCOUNT_FILE — a path to the JSON file (best for
+#      Linux/demo boxes with no `pass`; keep the file chmod 600)
+#   3. pass show google-tts-service-account (the Mac default)
 _google_tts_env_override = environ.get("GOOGLE_TTS_SERVICE_ACCOUNT_JSON")
+_google_tts_file = environ.get("GOOGLE_TTS_SERVICE_ACCOUNT_FILE", "").strip()
 _google_tts_creds: str | None = None
 
 
@@ -68,9 +73,20 @@ def get_google_tts_credentials() -> str:
     if _google_tts_creds is None:
         if _google_tts_env_override:
             _google_tts_creds = _google_tts_env_override
+        elif _google_tts_file:
+            try:
+                _google_tts_creds = Path(_google_tts_file).read_text()
+            except Exception:
+                _google_tts_creds = ""
         else:
             _google_tts_creds = _pass_show("google-tts-service-account")
     return _google_tts_creds
+
+
+# Force a TTS provider server-side regardless of what the client requests.
+# The demo sets this to "google" so review always hears the good voice even
+# though the app defaults to local `say`.
+FORCE_TTS = environ.get("VOICE_FORCE_TTS", "").strip()
 
 
 GOOGLE_TTS_VOICE = environ.get("GOOGLE_TTS_VOICE", "en-US-Chirp3-HD-Schedar")
