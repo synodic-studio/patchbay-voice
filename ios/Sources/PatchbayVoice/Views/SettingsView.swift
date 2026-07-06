@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("createClaudeMD") private var createClaudeMD = false
     @AppStorage("autoCommitEnabled") private var autoCommitEnabled = false
     @AppStorage("autoCommitBranch") private var autoCommitBranch = "patchbay"
+    @AppStorage("autoPushEnabled") private var autoPushEnabled = false
     @State private var serverVersionText = "—"
 
     var body: some View {
