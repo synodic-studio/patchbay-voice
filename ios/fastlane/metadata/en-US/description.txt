@@ -14,6 +14,12 @@ What it does
 - Optionally commit and push those notes when the repository supports it.
 - Designed so a turn always comes back with something audible, even if a step fails.
 
-Patchbay Voice is a developer tool. It talks to a small open-source server (MIT licensed) that you run yourself, on macOS or Linux or a remote machine, with pi installed. It is not a standalone assistant.
+Getting started
 
-Source and setup: github.com/synodic-studio/patchbay-voice
+Patchbay Voice is a developer tool and a companion to a server you run yourself. It is not a standalone app, so there is a quick one-time setup:
+
+1. Install and start the open-source Patchbay Voice server (MIT licensed) on your own machine, macOS or Linux, with pi installed.
+2. In the app, open Settings and enter your server's URL.
+3. Pick a repository and start talking.
+
+The app walks you through these steps on first launch. Source and setup: github.com/synodic-studio/patchbay-voice
