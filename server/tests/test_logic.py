@@ -664,7 +664,8 @@ class TestTtsFallback:
     """Tests for the one-way TTS fallback chain: Google → local engine → static clip."""
 
     def test_google_fallback_to_say_succeeds(self, tmp_path):
-        """Google failure → falls back to say → returns say path, not degraded."""
+        """Google failure → falls back to say → returns say path, flagged degraded
+        (it isn't the good voice, so the client can react — e.g. speak on-device)."""
         import asyncio
 
         from unittest.mock import AsyncMock, patch
@@ -681,7 +682,7 @@ class TestTtsFallback:
             path, degraded = asyncio.run(tts_mod.synthesize("hello", provider="google"))
 
         assert path == say_path
-        assert not degraded
+        assert degraded
 
     def test_google_and_say_both_fail_returns_static(self, tmp_path):
         """Google failure → say also fails → returns static clip path, degraded."""
@@ -788,8 +789,9 @@ class TestTtsFallback:
         assert paths[0] == say_path  # first chunk fell back to say
         assert paths[1] == google_success
         assert paths[2] == google_success
-        # Not degraded overall — the failed chunk successfully fell back to say
-        assert not any_degraded
+        # Degraded overall — a chunk had to drop off Google to the local engine,
+        # so the client is told (and the iOS app can speak on-device instead).
+        assert any_degraded
 
     def test_multi_chunk_one_chunk_both_providers_fail(self, tmp_path):
         """Multi-chunk: one chunk fails both Google and say → static clip for that chunk."""

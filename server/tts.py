@@ -5,6 +5,7 @@ import base64
 import re
 import shutil
 import subprocess
+import threading
 import uuid
 from pathlib import Path
 
@@ -56,10 +57,13 @@ async def synthesize(
             return (path, False)
         except Exception:
             pass
-        # Google failed — fall back to the local engine
+        # Google failed — fall back to the local engine, but flag it degraded so
+        # the client knows this chunk isn't the good voice. The iOS app then
+        # speaks the whole reply on-device rather than playing a mix of Google
+        # and the robotic local engine across a single response.
         try:
             path = await _local_tts(text, speaking_rate=speaking_rate)
-            return (path, False)
+            return (path, True)
         except Exception:
             return (_STATIC_FALLBACK, True)
     else:
@@ -202,6 +206,7 @@ async def _espeak_tts(text: str, speaking_rate: float = 1.0) -> Path:
 
 
 _google_creds = None
+_google_creds_lock = threading.Lock()
 
 
 def _get_google_token() -> str:
@@ -216,41 +221,54 @@ def _get_google_token() -> str:
     creds_json = get_google_tts_credentials()
 
     if not creds_json:
-        raise RuntimeError("google-tts-service-account not found in pass")
+        raise RuntimeError("google-tts-service-account not found")
 
-    if _google_creds is None:
-        info = json.loads(creds_json)
-        _google_creds = google.oauth2.service_account.Credentials.from_service_account_info(
-            info, scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-
-    if not _google_creds.valid:
-        _google_creds.refresh(google.auth.transport.requests.Request())
-
-    return _google_creds.token
+    # Serialize credential build + refresh. synthesize_chunked fires every
+    # sentence at Google concurrently (each token fetch in its own thread); a
+    # cold-cache race here had multiple threads building/refreshing the shared
+    # credentials at once, and the losers failed Google and dropped to the
+    # robotic local engine mid-reply. The lock makes the first thread build the
+    # token and the rest reuse it.
+    with _google_creds_lock:
+        if _google_creds is None:
+            info = json.loads(creds_json)
+            _google_creds = google.oauth2.service_account.Credentials.from_service_account_info(
+                info, scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+        if not _google_creds.valid:
+            _google_creds.refresh(google.auth.transport.requests.Request())
+        return _google_creds.token
 
 
 async def _google_tts(text: str, speaking_rate: float = 1.0) -> Path:
     import httpx
 
-    token = await asyncio.to_thread(_get_google_token)
     uid = uuid.uuid4().hex
     out = AUDIO_DIR / f"{uid}.mp3"
-
     payload = {
         "input": {"text": text},
         "voice": {"languageCode": "en-US", "name": GOOGLE_TTS_VOICE},
         "audioConfig": {"audioEncoding": "MP3", "speakingRate": max(0.25, min(4.0, speaking_rate))},
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(
-            "https://texttospeech.googleapis.com/v1/text:synthesize",
-            json=payload,
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        if resp.status_code != 200:
-            raise RuntimeError(f"Google TTS error {resp.status_code}: {resp.text[:200]}")
-
-    out.write_bytes(base64.b64decode(resp.json()["audioContent"]))
-    return out
+    # One retry: a transient blip on a single chunk shouldn't drop that chunk to
+    # the local engine while its neighbors stay on Google (the "alternating voice").
+    last_error: Exception = RuntimeError("Google TTS failed")
+    for attempt in range(2):
+        try:
+            token = await asyncio.to_thread(_get_google_token)
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    "https://texttospeech.googleapis.com/v1/text:synthesize",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+            if resp.status_code == 200:
+                out.write_bytes(base64.b64decode(resp.json()["audioContent"]))
+                return out
+            last_error = RuntimeError(f"Google TTS error {resp.status_code}: {resp.text[:200]}")
+        except Exception as exc:
+            last_error = exc
+        if attempt == 0:
+            await asyncio.sleep(0.3)
+    raise last_error
