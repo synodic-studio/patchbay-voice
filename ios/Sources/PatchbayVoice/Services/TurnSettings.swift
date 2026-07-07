@@ -17,7 +17,10 @@ struct TurnSettings: Sendable {
         let rate = defaults.object(forKey: "speakingRate") as? Double ?? 1.0
         return TurnSettings(
             model: defaults.string(forKey: "selectedModelAlias") ?? "small",
-            audioResponse: defaults.bool(forKey: "audioResponseEnabled"),
+            // Default ON to match the @AppStorage default; plain bool(forKey:)
+            // returns false when the key was never written, which would silently
+            // suppress spoken replies on a fresh install.
+            audioResponse: defaults.object(forKey: "audioResponseEnabled") as? Bool ?? true,
             savePath: defaults.string(forKey: "defaultSavePath").flatMap { $0.isEmpty ? nil : $0 },
             ttsProvider: {
                 let provider = defaults.string(forKey: "ttsProvider") ?? "say"
