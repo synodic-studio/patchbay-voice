@@ -38,6 +38,17 @@ _chat_audio_files: dict[str, list[Path]] = {}
 # Generic spoken notice for Failed turns — never the raw technical detail.
 GENERIC_FAILURE_NOTICE = "Something went wrong, please try again."
 
+# Body shared by the auto-created AGENTS.md / CLAUDE.md context files. Written
+# so a coding agent that later opens the project understands what this folder is.
+_SAVED_NOTES_BLURB = (
+    "This directory holds notes, plans, and summaries saved during Patchbay Voice "
+    "sessions — a voice interface to a coding agent. Files here are written by the "
+    "agent's write_file tool when the user, speaking, asks it to record something.\n\n"
+    "Treat these files as durable context for this project across sessions, not "
+    "throwaway scratch: read them for background before starting work, and keep any "
+    "new notes here concise.\n"
+)
+
 
 @router.post("/api/talk")
 async def talk(
@@ -92,9 +103,9 @@ async def talk(
         # Create save directory and optional init files
         abs_save.mkdir(parents=True, exist_ok=True)
         if _truthy(create_agents_md):
-            _ensure_file(abs_save / "AGENTS.md", "# Agent Notes\n\nContext saved by Patchbay Voice.\n")
+            _ensure_file(abs_save / "AGENTS.md", f"# Agent Notes\n\n{_SAVED_NOTES_BLURB}")
         if _truthy(create_claude_md):
-            _ensure_file(abs_save / "CLAUDE.md", "# Claude Context\n\nContext created by Patchbay Voice.\n")
+            _ensure_file(abs_save / "CLAUDE.md", f"# Project Context\n\n{_SAVED_NOTES_BLURB}")
 
         # Transcribe or use provided text
         t_asr = 0.0

@@ -21,6 +21,9 @@ router = APIRouter()
 def _compute_version() -> tuple[str, str]:
     """Return (version, source) resolved once at startup."""
     server_dir = Path(__file__).resolve().parent.parent
+    env_version = os.environ.get("VOICE_VERSION", "").strip()
+    if env_version:
+        return env_version, "env"
     build_info = server_dir / "BUILD_INFO"
     if build_info.is_file():
         return build_info.read_text().strip(), "homebrew"
