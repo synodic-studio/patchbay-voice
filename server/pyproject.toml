@@ -10,6 +10,7 @@ dependencies = [
     "httpx>=0.28.0",
     "google-auth>=2.40.0",
     "requests>=2.32.0",
+    "segno>=1.6.0",
 ]
 
 [dependency-groups]

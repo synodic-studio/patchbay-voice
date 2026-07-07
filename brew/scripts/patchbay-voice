@@ -41,13 +41,23 @@ case "${1:-start}" in
         ;;
     logs) exec tail -f "${HOME}/Library/Logs/patchbay-voice-server.log" ;;
     urls) _discover_urls ;;
+    qr)
+        # Print a setup QR (and deep link) so the app can be configured by
+        # scanning — no typing the URL or token. Optional arg overrides the URL.
+        cd "$PB_LIBEXEC"
+        export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        export PB_WIFI="$(ipconfig getifaddr en0 2>/dev/null || true)"
+        command -v tailscale &>/dev/null && export PB_TAILSCALE="$(tailscale ip -4 2>/dev/null | head -1 || true)"
+        exec uv run python qr_setup.py "${2:-}"
+        ;;
     version) echo "Patchbay Voice Server ${PB_VERSION:-development}" ;;
     help|--help|-h|*)
-        echo "Usage: patchbay-voice <start|status|logs|urls|version>"
+        echo "Usage: patchbay-voice <start|status|logs|urls|qr|version>"
         echo "  start    Start the server (foreground)"
         echo "  status   Show server status and connection URLs"
         echo "  logs     Tail the server log"
         echo "  urls     Show connection URLs for the iOS app"
+        echo "  qr [url] Print a setup QR code to configure the app by scanning"
         echo "  version  Print version"
         ;;
 esac

@@ -117,6 +117,10 @@ launchctl setenv VOICE_HOST 0.0.0.0 && \
 
 > **Pick one approach.** The Homebrew formula and the repo-checkout LaunchAgent plist (above) manage the same service. Choose one; do not load both.
 
+### Configure the app by QR (no typing)
+
+Run `patchbay-voice qr` on the server to print a setup QR that encodes the server URL and token. Scan it with the iPhone's Camera app (it offers "Open in Patchbay Voice") or in the app via **Settings → Scan setup code**, and the URL and token are filled in for you. Pass a URL to override the auto-detected one: `patchbay-voice qr http://my-host:31552`.
+
 ## Authentication (optional)
 
 Auth is off by default. On a loopback or Tailscale-only bind, the network is the boundary. If you expose the server more widely, set a shared token:
