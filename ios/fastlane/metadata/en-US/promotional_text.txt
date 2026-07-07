@@ -1,1 +1,1 @@
-Hold a button, describe what you want built, and hear your AI coding agent reply. A voice interface to pi, backed by a lightweight server on your own Mac.
+Hold a button and ask about your code: what a project does, what changed, how something works. Then have the agent save notes and plans for you, by voice.

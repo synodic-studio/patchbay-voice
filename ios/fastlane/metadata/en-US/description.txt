@@ -1,16 +1,19 @@
-Patchbay Voice is a voice interface to pi, a multi-model AI coding agent. Hold a button, describe what you want built, and release. By the time you lower your phone, pi is already working.
+Patchbay Voice lets you talk to your codebase. Hold a button and ask about a project out loud, like what it does, how a piece works, or what changed in the last commit, and hear the answer back. When something is worth keeping, ask the agent to save a note or a plan, and it writes it to a folder in the repo for you.
 
-The app talks to a lightweight server you run on your own Mac, alongside pi. Your audio is transcribed locally with faster-whisper, so it never leaves your machine, and the reply is read back to you. It is built for the moments you are not looking at a screen: reviewing what your agent just built while on a walk, then dictating the next instruction, keeping the whole exchange conversational.
+It drives pi, a multi-model AI coding agent, with its tools deliberately scoped. The agent can read your files, search the code, and inspect git history, and it can save notes only to a path you choose. It reads and reasons about your project and records your thoughts. It does not modify your code.
+
+It is built for the moments you are not looking at a screen: walking through what a codebase does, catching up on what changed, or dictating a plan for later, all conversational.
 
 What it does
 
-- Hold to talk, or switch to the keyboard when you need precise input.
-- Spoken replies with an adjustable speaking rate, so you can listen instead of read.
-- One session per repository. Selecting a repo sets the agent's working directory and keeps each project's context separate.
-- A model picker, so you can trade speed for capability from one turn to the next.
-- Optional auto-commit and auto-push of saved notes, enabled only when the project is a Git repository (and, for push, has a remote), so a toggle is never a silent no-op.
-- Designed so a turn always comes back with something audible. If transcription or the agent fails, you hear a short spoken notice instead of silence.
+- Ask about your code by voice, or type when you need precision.
+- Spoken replies, from the server or your device's own voice, at an adjustable rate.
+- One session per repository, so each project's context stays separate.
+- The agent reads files, searches, and inspects git history: log, diff, blame, branches.
+- Save notes, plans, and summaries to a folder in the repo. The agent cannot touch anything outside it.
+- Optionally commit and push those notes when the repository supports it.
+- Designed so a turn always comes back with something audible, even if a step fails.
 
-Patchbay Voice is a developer tool. It requires your own Mac running the open-source Patchbay Voice server (MIT licensed) with pi installed. It is not a standalone assistant and does not work on its own.
+Patchbay Voice is a developer tool. It talks to a small open-source server (MIT licensed) that you run yourself, on macOS or Linux or a remote machine, with pi installed. It is not a standalone assistant.
 
 Source and setup: github.com/synodic-studio/patchbay-voice
