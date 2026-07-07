@@ -4,6 +4,7 @@ struct ContentView: View {
     @Environment(ChatManager.self) private var chatManager
     @State private var showSessions = false
     @State private var showSettings = false
+    @State private var pendingSetup: SetupLink.Config?
 
     var body: some View {
         NavigationStack {
@@ -23,7 +24,24 @@ struct ContentView: View {
             },
         )
         .task { await chatManager.load() }
+        .onOpenURL { pendingSetup = SetupLink.parse($0) }
+        .alert("Connect to this server?", isPresented: setupPromptBinding, presenting: pendingSetup) { config in
+            Button("Connect") { applySetup(config) }
+            Button("Cancel", role: .cancel) {}
+        } message: { config in
+            Text("This will point Patchbay Voice at \(config.host) and replace your current server settings.")
+        }
         .preferredColorScheme(.dark)
+    }
+
+    private var setupPromptBinding: Binding<Bool> {
+        Binding(get: { pendingSetup != nil }, set: { if !$0 { pendingSetup = nil } })
+    }
+
+    private func applySetup(_ config: SetupLink.Config) {
+        SetupLink.apply(config)
+        pendingSetup = nil
+        Task { await chatManager.load() }
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {

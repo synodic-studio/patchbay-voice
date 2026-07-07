@@ -17,6 +17,7 @@ struct SettingsView: View {
     @AppStorage("autoCommitBranch") private var autoCommitBranch = "patchbay"
     @AppStorage("autoPushEnabled") private var autoPushEnabled = false
     @State private var serverVersionText = "—"
+    @State private var showScanner = false
 
     var body: some View {
         NavigationStack {
@@ -31,6 +32,9 @@ struct SettingsView: View {
             .task { await loadServerVersion() }
             .navigationTitle("Settings")
             .toolbar { toolbarDone }
+            .sheet(isPresented: $showScanner) {
+                ScannerSheet { SetupLink.apply($0) }
+            }
         }
     }
 
@@ -61,6 +65,9 @@ struct SettingsView: View {
             SecureField("Token (not required)", text: $serverToken)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
+            Button { showScanner = true } label: {
+                Label("Scan setup code", systemImage: "qrcode.viewfinder")
+            }
         }
     }
 

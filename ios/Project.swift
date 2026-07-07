@@ -22,6 +22,13 @@ let project = Project(
                 "CFBundleShortVersionString": "$(MARKETING_VERSION)",
                 "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
                 "NSMicrophoneUsageDescription": "Patchbay Voice records your voice to send to the coding assistant.",
+                "NSCameraUsageDescription": "Patchbay Voice scans a setup QR code to fill in your server address and token.",
+                "CFBundleURLTypes": [
+                    [
+                        "CFBundleURLName": "co.synodic.patchbay-voice",
+                        "CFBundleURLSchemes": ["patchbay-voice"],
+                    ],
+                ],
                 "UIBackgroundModes": ["audio"],
                 "ITSAppUsesNonExemptEncryption": false,
                 "UIApplicationSceneManifest": [
