@@ -36,7 +36,7 @@ let project = Project(
                     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
                     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
                     "MARKETING_VERSION": "0.1.0",
-                    "CURRENT_PROJECT_VERSION": "20",
+                    "CURRENT_PROJECT_VERSION": "21",
                 ],
                 configurations: [
                     .debug(name: "Debug", settings: [
