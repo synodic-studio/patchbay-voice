@@ -14,7 +14,7 @@ let project = Project(
     targets: [
         .target(
             name: "PatchbayVoice",
-            destinations: .iOS,
+            destinations: [.iPhone],
             product: .app,
             bundleId: "co.synodic.patchbay-voice",
             deploymentTargets: .iOS("17.0"),
@@ -36,7 +36,7 @@ let project = Project(
                     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
                     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
                     "MARKETING_VERSION": "0.1.0",
-                    "CURRENT_PROJECT_VERSION": "19",
+                    "CURRENT_PROJECT_VERSION": "20",
                 ],
                 configurations: [
                     .debug(name: "Debug", settings: [
@@ -51,7 +51,7 @@ let project = Project(
         ),
         .target(
             name: "PatchbayVoiceTests",
-            destinations: .iOS,
+            destinations: [.iPhone],
             product: .unitTests,
             bundleId: "co.synodic.patchbay-voice-tests",
             deploymentTargets: .iOS("17.0"),
@@ -60,7 +60,7 @@ let project = Project(
         ),
         .target(
             name: "PatchbayVoiceUITests",
-            destinations: .iOS,
+            destinations: [.iPhone],
             product: .uiTests,
             bundleId: "co.synodic.patchbay-voice-uitests",
             deploymentTargets: .iOS("17.0"),
