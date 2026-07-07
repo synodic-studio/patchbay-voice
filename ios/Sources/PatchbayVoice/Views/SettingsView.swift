@@ -22,6 +22,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 serverSection
+                setupSection
                 ModelSectionView()
                 voiceSection
                 filesSection
@@ -60,6 +61,21 @@ struct SettingsView: View {
             SecureField("Token (not required)", text: $serverToken)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
+        }
+    }
+
+    private var setupSection: some View {
+        Section("Setup") {
+            Text(
+                "Patchbay Voice is a client for the open-source Patchbay Voice server, which "
+                    + "you run on your own Mac or Linux machine alongside the pi coding agent. "
+                    + "Enter that server's URL above, then pick a repository from Sessions.",
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            Link(destination: URL(string: "https://github.com/synodic-studio/patchbay-voice")!) {
+                Label("Setup & documentation", systemImage: "arrow.up.right.square")
+            }
         }
     }
 
