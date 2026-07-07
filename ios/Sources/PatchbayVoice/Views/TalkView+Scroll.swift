@@ -37,14 +37,10 @@ extension TalkView {
 
     @ViewBuilder var emptyState: some View {
         if viewModel.turns.isEmpty, !viewModel.isProcessing {
-            Text(
-                chatManager.currentChat == nil
-                    ? "Open Sessions to get started"
-                    : "Hold to talk or type below",
-            )
-            .foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.top, 60)
+            Text("Hold to talk or type below")
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 60)
         }
     }
 

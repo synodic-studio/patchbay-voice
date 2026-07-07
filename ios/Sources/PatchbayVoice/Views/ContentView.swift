@@ -12,12 +12,16 @@ struct ContentView: View {
                 .toolbar { toolbarContent }
         }
         .sheet(isPresented: $showSessions) { ChatListView() }
-        .sheet(isPresented: $showSettings, onDismiss: { Task { await chatManager.load() } }) {
-            SettingsView(
-                canCommit: chatManager.currentChat?.canCommit ?? false,
-                canPush: chatManager.currentChat?.canPush ?? false,
-            )
-        }
+        .sheet(
+            isPresented: $showSettings,
+            onDismiss: { Task { await chatManager.load() } },
+            content: {
+                SettingsView(
+                    canCommit: chatManager.currentChat?.canCommit ?? false,
+                    canPush: chatManager.currentChat?.canPush ?? false,
+                )
+            },
+        )
         .task { await chatManager.load() }
         .preferredColorScheme(.dark)
     }

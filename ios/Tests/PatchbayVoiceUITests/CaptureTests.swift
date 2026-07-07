@@ -63,4 +63,15 @@ final class CaptureTests: XCTestCase {
         app.buttons["Done"].tap()
         sleep(1)
     }
+
+    /// Capture the first-run onboarding: launch WITHOUT the mock so there are no
+    /// sessions and the setup card shows.
+    func testCaptureOnboarding() throws {
+        let fresh = XCUIApplication()
+        fresh.launchArguments = ["-serverURL", "http://127.0.0.1:59999"]  // dead port -> no sessions -> onboarding
+        fresh.launch()
+        _ = fresh.wait(for: .runningForeground, timeout: 10)
+        sleep(3)
+        screenshot("sim-onboarding")
+    }
 }

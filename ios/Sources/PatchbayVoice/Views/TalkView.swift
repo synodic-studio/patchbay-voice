@@ -11,7 +11,7 @@ struct TalkView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            historyScroll
+            mainContent
             bottomBar
         }
         .background(Color.graphiteBase.ignoresSafeArea())
@@ -27,6 +27,17 @@ struct TalkView: View {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {
             Text(viewModel.errorMessage ?? "")
+        }
+    }
+
+    /// No sessions yet (fresh install or unreachable server): guide the user to
+    /// connect their server. Otherwise show the conversation.
+    @ViewBuilder private var mainContent: some View {
+        if chatManager.chats.isEmpty {
+            OnboardingCard()
+            Spacer()
+        } else {
+            historyScroll
         }
     }
 }
