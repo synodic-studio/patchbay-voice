@@ -81,6 +81,12 @@ Runs on port 31552 by default. Configure with environment variables:
 | `TTS_SPEAKING_RATE` | `1.0` | Default speaking rate (0.5–2.0) |
 | `GOOGLE_TTS_VOICE` | `en-US-Chirp3-HD-Schedar` | Google Cloud TTS voice |
 | `GOOGLE_TTS_SERVICE_ACCOUNT_JSON` | *(from pass)* | Google service account JSON string |
+| `GOOGLE_TTS_SERVICE_ACCOUNT_FILE` | *(unset)* | Path to the Google service-account JSON file (for Linux boxes with no `pass`) |
+| `LOCAL_TTS_ENGINE` | *(auto)* | Force the local engine: `say`, `piper`, or `espeak` (auto-detects when unset) |
+| `VOICE_FORCE_MODEL` | *(unset)* | Pin the pi model server-side, ignoring the client's request (demo / locked-down servers) |
+| `VOICE_FORCE_TTS` | *(unset)* | Pin the TTS provider server-side (e.g. `google`), ignoring the client's request |
+| `VOICE_ONDEVICE_PROJECTS` | *(unset)* | Comma-separated project dirs for which the server returns no audio, so a capable client speaks on-device |
+| `VOICE_VERSION` | *(git/BUILD_INFO)* | Version string reported at `/api/version` (stamp a deploy that isn't a git checkout) |
 
 To run as a persistent macOS service, copy and load the included plist:
 

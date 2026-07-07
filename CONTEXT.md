@@ -1,6 +1,6 @@
 # Patchbay Voice
 
-A voice interface to the `pi` coding agent — speak to it from a phone or browser, it codes, it speaks back.
+A voice interface to the `pi` coding agent: speak to it from a phone or browser, ask about a codebase, and it reads the code, inspects git history, saves Notes, and speaks the answer back. It does not edit your code (see docs/adr/0008).
 
 ## Language
 
@@ -31,3 +31,7 @@ _Avoid_: interrupt, inject (use only when distinguishing from steer's non-interr
 **Note**:
 A file pi writes via the `write_file` tool to record something for later — notes, plans, anything the user asks it to save. Lives under a project's configured save path (`docs/patchbay/` by default), separate from the conversation itself: a Note is content pi produces as a side effect of a turn, not the turn's reply.
 _Avoid_: memo, document, file (too generic — use Note for anything written via write_file specifically)
+
+**On-device voice**:
+A reply spoken by the app itself using the phone's built-in speech (`AVSpeechSynthesizer`), instead of audio synthesized by the server. Used automatically when the server sends no audio or a Degraded turn's audio, and also available as a selectable TTS provider (see docs/adr/0006). Independent of the server's own fallback chain.
+_Avoid_: local TTS (ambiguous with the server's local engine — say "on-device" for the client, "local engine" for the server's say/espeak/piper)
