@@ -1,0 +1,22 @@
+{
+    "chats": {
+        "b1fe3e36bd584aeca7869569d1fa8b9a": {
+            "id": "b1fe3e36bd584aeca7869569d1fa8b9a",
+            "name": "demo-project",
+            "project_dir": "demo-project",
+            "pi_session_id": null,
+            "created_at": 1783295001.5290496,
+            "last_active": 1783295001.5290496
+        }
+    },
+    "turns": [
+        {
+            "id": "c1fbab49b7bc423e926dc9fbd98b712f",
+            "chat_id": "b1fe3e36bd584aeca7869569d1fa8b9a",
+            "transcript": "How do I try this demo?",
+            "reply": "Welcome to the Patchbay Voice demo. Type below, or hold the mic button and speak. To watch me read the project, try asking: What sections are in the readme? Then, to see me save a note for you, try: Write a note called ideas.md with three features the widget store could add. Tap the sessions button in the top left to switch to the second project or start a new one.",
+            "created_at": 1783295001.5290496,
+            "failed": false
+        }
+    ]
+}
