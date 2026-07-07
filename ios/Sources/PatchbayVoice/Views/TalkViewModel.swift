@@ -41,8 +41,7 @@ final class TalkViewModel {
 
     private func _mergeServerTurns(forChatID id: String, client: ServerClient) async {
         // Server is the source of truth: replace the local cache on a successful
-        // fetch (so a server-side reset/deletion shows up instead of lingering),
-        // and keep the local mirror only when the fetch fails.
+        // fetch (so a reset shows up), and keep it only when the fetch fails.
         guard let serverTurns = try? await client.fetchTurns(chatID: id) else { return }
         let refreshed = serverTurns.map {
             TurnItem(transcript: $0.transcript, reply: $0.reply, failed: $0.failed)
@@ -156,10 +155,11 @@ extension TalkViewModel {
         let settings = TurnSettings.current
         guard settings.audioResponse else { return }
         let paths = response.allAudioPaths
-        // No audio, or the server fell back to a lesser engine (audio_degraded):
-        // speak the reply on-device instead. Failed turns keep the server notice
-        // (response.reply is the raw error there).
-        if !response.failed, !response.reply.isEmpty, paths.isEmpty || response.audioDegraded {
+        // Speak on-device when the user picked that voice, or the server sent no
+        // audio / fell back (degraded). Failed turns keep the server notice.
+        if !response.failed, !response.reply.isEmpty,
+           settings.onDevice || paths.isEmpty || response.audioDegraded
+        {
             player.speak(response.reply, rate: settings.speakingRate)
             return
         }

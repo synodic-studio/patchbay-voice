@@ -67,8 +67,9 @@ struct SettingsView: View {
         Section("Voice") {
             Toggle("Spoken replies", isOn: $audioResponseEnabled)
             Picker("Provider", selection: $ttsProvider) {
-                Text("macOS Say").tag("say")
-                Text("Google Cloud").tag("google")
+                Text("On-device (Apple)").tag("ondevice")
+                Text("Server: macOS Say").tag("say")
+                Text("Server: Google Cloud").tag("google")
             }
             speakingRateSlider
         }

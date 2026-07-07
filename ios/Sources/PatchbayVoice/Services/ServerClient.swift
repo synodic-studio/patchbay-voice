@@ -127,7 +127,10 @@ struct ServerClient: Sendable {
     private func appendFields(to body: inout Data, boundary: String, chatID: String, settings: TurnSettings) {
         field(into: &body, boundary: boundary, name: "chat_id", value: chatID)
         field(into: &body, boundary: boundary, name: "model", value: settings.model)
-        field(into: &body, boundary: boundary, name: "audio_response", value: settings.audioResponse ? "true" : "false")
+        // On-device speech is synthesized by the app, so don't ask the server
+        // to make audio in that mode — it would just be wasted work.
+        let serverAudio = settings.audioResponse && !settings.onDevice
+        field(into: &body, boundary: boundary, name: "audio_response", value: serverAudio ? "true" : "false")
         field(into: &body, boundary: boundary, name: "chunked_audio", value: "true")
         if let savePath = settings.savePath {
             field(into: &body, boundary: boundary, name: "save_path", value: savePath)
