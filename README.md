@@ -1,20 +1,20 @@
 # Patchbay Voice
 
-Voice interface to [pi](https://github.com/earendil-works/pi), a multi-model AI coding agent. Speak into your phone (or browser), pi codes, it speaks back.
+Voice interface to your codebase, powered by [pi](https://github.com/earendil-works/pi), a multi-model AI coding agent. Speak into your phone (or browser), ask about your code, hear the answer — and have it save notes for you.
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg) ![Platform: iOS 17+ · macOS server](https://img.shields.io/badge/platform-iOS%2017%2B%20%C2%B7%20macOS%20server-lightgrey.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg) ![Platform: iOS 17+ · macOS/Linux server](https://img.shields.io/badge/platform-iOS%2017%2B%20%C2%B7%20macOS%2FLinux%20server-lightgrey.svg)
 
 <p align="center">
-  <img src="docs/screenshots/talk.png" width="30%" alt="Talk screen: a spoken conversation with the coding agent" />
+  <img src="docs/screenshots/talk.png" width="30%" alt="Talk screen: a spoken conversation about a codebase" />
   <img src="docs/screenshots/sessions.png" width="30%" alt="Sessions list, one per repository" />
   <img src="docs/screenshots/settings.png" width="30%" alt="Settings: model, voice, and server" />
 </p>
 
 ## What it is
 
-A two-part system: an iOS app and a local server that runs on the same machine as pi.
+A two-part system: an iOS app and a server that runs alongside pi on a machine you control (macOS or Linux, local or remote).
 
-You hold a button, say what you want built. The server transcribes it with faster-whisper, sends it to pi (via a custom extension bundled in the repo), and streams the response back as audio. The whole exchange is stored per-session so context accumulates across turns.
+You hold a button and ask about a project — what it does, how a piece works, what changed in the last commit. The server transcribes it with faster-whisper, sends it to pi (via a custom extension bundled in the repo), and streams the spoken answer back. The agent can read files, search, and inspect git history, and it can save notes to a locked folder in the repo — it does not modify your code. The whole exchange is stored per-session so context accumulates across turns.
 
 Two clients ship with the repo: a native iOS app and a single-file web client served directly by the server at `GET /`. Both share the same API.
 
@@ -43,12 +43,12 @@ Sessions map one-to-one to directories under `~/Developer`. Each session carries
 
 ## System Requirements
 
-- **macOS** (server runs on your Mac)
+- **macOS or Linux** (the server host — local or remote)
 - **[pi](https://github.com/earendil-works/pi)** coding agent in `$PATH` (`pi` binary)
 - **[uv](https://github.com/astral-sh/uv)** for Python dependency management
 - **[Node.js](https://nodejs.org)** (required by pi to load the TypeScript extension)
 - **faster-whisper** (bundled via uv — no manual install)
-- **Google Cloud service account** with Text-to-Speech API enabled (optional — defaults to macOS `say`)
+- **Google Cloud service account** with Text-to-Speech API enabled (optional — falls back to a local voice: macOS `say`, or `espeak`/`piper` on Linux)
 
 ## Server
 
