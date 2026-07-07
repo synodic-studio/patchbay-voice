@@ -209,3 +209,54 @@ class TestPiperArgs:
         i = argv.index("--length_scale")
         assert argv[i + 1] == "0.5"  # 1 / 2.0
         assert captured["kwargs"].get("input") == "hello there"
+
+
+class TestOnDeviceProjects:
+    """Projects listed in ONDEVICE_PROJECTS get no server audio, so a capable
+    client (the iOS app) speaks the reply with its own on-device voice."""
+
+    def test_ondevice_project_returns_no_server_audio(self, client, chat_id):
+        import routes.talk as talk_mod
+
+        async def fake_run_pi(transcript, chat, save_path="", model=""):
+            return "This is the spoken reply."
+
+        with (
+            patch.object(talk_mod, "run_pi", fake_run_pi),
+            patch.object(talk_mod, "ONDEVICE_PROJECTS", {"proj"}),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "hi", "audio_response": "true"},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["reply"] == "This is the spoken reply."
+        assert body["audio_urls"] == []  # no server audio -> app speaks on-device
+        assert body["audio_url"] is None
+
+    def test_normal_project_is_unaffected(self, client, chat_id):
+        import routes.talk as talk_mod
+        import tts as tts_module
+
+        async def fake_run_pi(transcript, chat, save_path="", model=""):
+            return "Reply."
+
+        async def fake_synth(text, provider="say", speaking_rate=1.0):
+            from config import AUDIO_DIR
+
+            p = AUDIO_DIR / "unit-test.m4a"
+            p.write_bytes(b"x")
+            return (p, False)
+
+        with (
+            patch.object(talk_mod, "run_pi", fake_run_pi),
+            patch.object(talk_mod, "ONDEVICE_PROJECTS", set()),
+            patch.object(tts_module, "synthesize", fake_synth),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "hi", "audio_response": "true"},
+            )
+        assert r.status_code == 200
+        assert r.json()["audio_urls"]  # server produced audio as usual

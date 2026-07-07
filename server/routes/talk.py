@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 import asr as asr_mod
 import tts as tts_mod
 from chats import _chats, add_turn, save_chats
-from config import AUDIO_DIR, DEVELOPER_DIR, FORCE_TTS
+from config import AUDIO_DIR, DEVELOPER_DIR, FORCE_TTS, ONDEVICE_PROJECTS
 from pi_runner import run_pi
 
 router = APIRouter()
@@ -70,7 +70,10 @@ async def talk(
     async with _talk_locks[chat_id]:
         # ADR 0005: evict previous turn's audio before generating this one
         _evict_chat_audio(chat_id)
-        want_audio = _truthy(audio_response)
+        # For on-device projects the server makes no audio, so the app speaks the
+        # reply with its own on-device voice (empty audio_urls triggers that path).
+        on_device = chat.project_dir in ONDEVICE_PROJECTS
+        want_audio = _truthy(audio_response) and not on_device
         want_chunked = _truthy(chunked_audio)
         want_commit = _truthy(auto_commit)
         want_push = _truthy(auto_push)

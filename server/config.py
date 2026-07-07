@@ -88,6 +88,14 @@ def get_google_tts_credentials() -> str:
 # though the app defaults to local `say`.
 FORCE_TTS = environ.get("VOICE_FORCE_TTS", "").strip()
 
+# Projects for which the server produces NO audio, so a client that supports it
+# (the iOS app) speaks the reply with its own on-device voice. The demo uses one
+# project on server-side Google TTS and another on the on-device voice so a
+# reviewer can hear both.
+ONDEVICE_PROJECTS = {
+    p.strip() for p in environ.get("VOICE_ONDEVICE_PROJECTS", "").split(",") if p.strip()
+}
+
 
 GOOGLE_TTS_VOICE = environ.get("GOOGLE_TTS_VOICE", "en-US-Chirp3-HD-Schedar")
 TTS_SPEAKING_RATE = float(environ.get("TTS_SPEAKING_RATE", "1.0"))
