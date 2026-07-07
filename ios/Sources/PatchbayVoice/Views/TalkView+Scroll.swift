@@ -60,7 +60,9 @@ extension TalkView {
             transcriptBubble(turn.transcript)
             if turn.failed {
                 failedReplyBubble(text: turn.reply)
-            } else {
+            } else if !turn.reply.isEmpty {
+                // Empty reply = pending (optimistic user message); the thinking
+                // indicator below shows progress until the reply arrives.
                 replyBubble(text: turn.reply)
             }
         }

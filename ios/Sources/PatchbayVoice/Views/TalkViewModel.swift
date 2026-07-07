@@ -17,7 +17,8 @@ final class TalkViewModel {
 
     let recorder = RecorderManager()
     let player = PlayerManager()
-    private(set) var lastAudioChunks: [Data] = []
+    // not private(set): TalkViewModel+Audio.swift sets this from another file
+    var lastAudioChunks: [Data] = []
     private(set) var isMockRecording = false
 
     var hasReplayable: Bool { !lastAudioChunks.isEmpty }
@@ -117,7 +118,7 @@ extension TalkViewModel {
         do {
             let response = try await client.sendTurn(chatID: chat.id, audioData: audio, settings: .current)
             _appendTurn(TurnItem(transcript: response.transcript, reply: response.reply, failed: response.failed), chat: chat)
-            await _playResponse(response, client: client)
+            await playResponse(response, client: client)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -129,15 +130,35 @@ extension TalkViewModel {
         let isOnlyTurnInFlight = inFlightCount == 0
         inFlightCount += 1
         if isOnlyTurnInFlight { startStatusTimer() }
+        // We already know the typed text, so show it immediately with a pending
+        // reply instead of waiting for the round-trip.
+        let pendingID = _appendPending(transcript: text, chat: chat)
         do {
             let response = try await client.sendTextTurn(chatID: chat.id, text: text, settings: .current)
-            _appendTurn(TurnItem(transcript: text, reply: response.reply, failed: response.failed), chat: chat)
-            await _playResponse(response, client: client)
+            _resolveTurn(pendingID, reply: response.reply, failed: response.failed, chat: chat)
+            await playResponse(response, client: client)
         } catch {
-            errorMessage = error.localizedDescription
+            _resolveTurn(pendingID, reply: error.localizedDescription, failed: true, chat: chat)
         }
         inFlightCount -= 1
         _stopStatusTimerIfIdle()
+    }
+
+    /// Append a user turn with an empty (pending) reply and return its id.
+    private func _appendPending(transcript: String, chat: Chat) -> UUID {
+        let item = TurnItem(transcript: transcript, reply: "")
+        _appendTurn(item, chat: chat)
+        return item.id
+    }
+
+    /// Fill in a pending turn's reply once the server responds.
+    private func _resolveTurn(_ id: UUID, reply: String, failed: Bool, chat: Chat) {
+        guard let idx = turns.firstIndex(where: { $0.id == id }) else { return }
+        turns[idx].reply = reply
+        turns[idx].failed = failed
+        if let data = try? JSONEncoder().encode(turns) {
+            UserDefaults.standard.set(data, forKey: "turns.\(chat.id)")
+        }
     }
 
     /// Only the sole in-flight turn may drive the shared status line — with
@@ -149,52 +170,5 @@ extension TalkViewModel {
         statusTask?.cancel()
         statusTask = nil
         statusMessage = "Thinking…"
-    }
-
-    private func _playResponse(_ response: TurnResponse, client: ServerClient) async {
-        let settings = TurnSettings.current
-        guard settings.audioResponse else { return }
-        let paths = response.allAudioPaths
-        // Speak on-device when the user picked that voice, or the server sent no
-        // audio / fell back (degraded). Failed turns keep the server notice.
-        if !response.failed, !response.reply.isEmpty,
-           settings.onDevice || paths.isEmpty || response.audioDegraded
-        {
-            player.speak(response.reply, rate: settings.speakingRate)
-            return
-        }
-        guard !paths.isEmpty else { return }
-        if inFlightCount == 1 { statusMessage = "Generating audio…" }
-        do {
-            let chunks = try await _fetchAllChunks(paths: paths, client: client)
-            lastAudioChunks = chunks
-            try player.playSequence(chunks)
-        } catch {
-            if !response.failed, !response.reply.isEmpty {
-                player.speak(response.reply, rate: settings.speakingRate)
-            } else {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private func _fetchAllChunks(paths: [String], client: ServerClient) async throws -> [Data] {
-        try await withThrowingTaskGroup(of: (Int, Data).self) { group in
-            addFetchTasks(to: &group, paths: paths, client: client)
-            var result = [(Int, Data)]()
-            for try await pair in group {
-                result.append(pair)
-            }
-            return result.sorted { $0.0 < $1.0 }.map(\.1)
-        }
-    }
-
-    private func addFetchTasks(
-        to group: inout ThrowingTaskGroup<(Int, Data), any Error>,
-        paths: [String], client: ServerClient,
-    ) {
-        for (offset, path) in paths.enumerated() {
-            group.addTask { try await (offset, client.fetchAudio(path: path)) }
-        }
     }
 }

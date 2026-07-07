@@ -3,8 +3,8 @@ import Foundation
 struct TurnItem: Identifiable, Codable, Sendable {
     let id: UUID
     let transcript: String
-    let reply: String
-    let failed: Bool
+    var reply: String
+    var failed: Bool
 
     init(transcript: String, reply: String, failed: Bool = false) {
         id = UUID()
