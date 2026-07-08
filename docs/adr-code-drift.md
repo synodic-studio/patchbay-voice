@@ -10,7 +10,7 @@ UNVERIFIABLE = no code path found.
 |-----|--------|
 | 0001 tts-fallback-chain | CONFIRMED |
 | 0002 turn-submission-queue | **DRIFTED** (no durable queue; a per-chat lock holding the HTTP request open) |
-| 0003 failed-turn-persistence-and-audio | **DRIFTED** (failed-turn notice is silent in on-device mode) |
+| 0003 failed-turn-persistence-and-audio | **DRIFTED → RESOLVED** by ADR 0009 (client now speaks `spoken_notice`) |
 | 0004 single-chat-per-project | CONFIRMED |
 | 0005 audio-lifetime | CONFIRMED (in-memory tracking lost on restart) |
 | 0006 on-device-speech | CONFIRMED (see 0003 for the failed-turn silence) |
@@ -48,7 +48,16 @@ per-chat lock, which previously just made the caller wait."
 - CONFIRMED (client-side `pendingText` removed): no `pendingText` remains in
   `ios/`; each submission spawns its own task (`TalkViewModel.swift:114`, `:129`).
 
-## 0003 failed-turn-persistence-and-audio - DRIFTED
+## 0003 failed-turn-persistence-and-audio - DRIFTED → RESOLVED
+
+**Resolved** by [ADR 0009](adr/0009-client-speaks-failure-notice.md): the server now
+always returns the notice text as `spoken_notice` on a Failed turn (`talk.py`
+`_failed_response`), and the client speaks it on-device when the server sent no
+audio, via the pure `TalkViewModel.playback(for:onDevice:)` decision
+(`TalkViewModel+Audio.swift`), regression-tested in `PatchbayVoiceTests.swift`
+(`TalkViewModelPlaybackTests`) and `test_routes.py`
+(`test_failed_turn_carries_spoken_notice_without_server_audio`). The original
+finding, kept for the record:
 
 - DRIFTED - the failed-turn generic notice is silent in on-device TTS mode,
   breaking the ADR's concrete claim that the notice "gets synthesized and spoken"

@@ -7,3 +7,5 @@ The reply slot holds a fixed, generic, spoken-friendly notice ("Something went w
 A Failed turn never blocks the queue from ADR 0002 — the next queued turn on the chat proceeds normally. The API should signal a Failed turn explicitly (a boolean field, mirroring `audio_degraded` from ADR 0001) so clients can render it distinctly rather than inferring failure from reply content.
 
 Implementation note: fixing this also means closing a small leak riding along in `asr.py` — the uploaded audio temp file is only deleted *after* a successful transcription, so every transcription failure currently leaves it behind in `AUDIO_DIR` forever.
+
+**Update (see [ADR 0009](0009-client-speaks-failure-notice.md)).** "Spoken through the fallback chain" held only when the server produced the audio. In on-device TTS mode the server synthesizes nothing, and the client deliberately excludes Failed turns from on-device speech (ADR 0006), so the notice went silent, the exact hands-free failure this ADR set out to prevent. ADR 0009 closes that seam: the server always ships the notice text as `spoken_notice`, so whichever side owns TTS can voice it.

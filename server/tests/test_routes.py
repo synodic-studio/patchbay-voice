@@ -308,6 +308,28 @@ class TestTalkFailedTurn:
         assert len(persisted) == 1
         assert persisted[0].failed is False
 
+    def test_failed_turn_carries_spoken_notice_without_server_audio(self, client, chat_id):
+        """ADR 0009: on-device mode (audio_response=false) makes no server audio,
+        but the Failed turn must still carry the generic spoken notice so the
+        client can voice it instead of going silent. reply stays the raw detail."""
+        from unittest.mock import patch
+
+        from fastapi import HTTPException
+
+        from routes.talk import GENERIC_FAILURE_NOTICE
+
+        with patch("routes.talk.run_pi", side_effect=HTTPException(504, "pi timed out after 120s")):
+            r = client.post(
+                "/api/talk",
+                data={"chat_id": chat_id, "text": "my question", "audio_response": "false"},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["failed"] is True
+        assert body["audio_urls"] == []  # on-device: server synthesized nothing
+        assert body["spoken_notice"] == GENERIC_FAILURE_NOTICE  # ...but the notice is there to speak
+        assert "pi timed out" in body["reply"]  # raw detail stays in reply, never spoken
+
     def test_uploaded_audio_cleaned_up_on_asr_failure(self, client, chat_id, tmp_path):
         """Temp audio file is deleted even when ASR raises."""
         import routes.talk as talk_mod

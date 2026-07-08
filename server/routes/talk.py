@@ -280,7 +280,13 @@ def _evict_chat_audio(chat_id: str) -> None:
 def _failed_response(
     transcript: str, reply: str, audio_urls: list[str], audio_degraded: bool
 ) -> JSONResponse:
-    """Build the JSON response for a Failed turn."""
+    """Build the JSON response for a Failed turn.
+
+    Always carries the generic spoken notice text (never the raw technical
+    reply) so a client that owns TTS — e.g. on-device mode, where the server
+    makes no audio — can voice the failure itself instead of going silent.
+    See ADR 0003 and ADR 0009.
+    """
     return JSONResponse(
         {
             "transcript": transcript,
@@ -288,6 +294,7 @@ def _failed_response(
             "audio_url": audio_urls[0] if audio_urls else None,
             "audio_urls": audio_urls,
             "audio_degraded": audio_degraded,
+            "spoken_notice": GENERIC_FAILURE_NOTICE,
             "failed": True,
         }
     )

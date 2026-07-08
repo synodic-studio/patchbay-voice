@@ -162,6 +162,57 @@ struct TurnItemTests {
     }
 }
 
+// MARK: - TalkViewModel playback decision
+
+struct TalkViewModelPlaybackTests {
+    private static let notice = "Something went wrong, please try again."
+
+    // Regression: a Failed turn with no server audio (on-device TTS mode) must
+    // speak the generic notice, not go silent. This is the bug where the client
+    // gated on `!failed` and left the eyes-free user in silence on a failure.
+    @Test
+    func failedTurnWithoutServerAudioSpeaksNoticeOnDevice() {
+        let r = TurnResponse(
+            transcript: "q", reply: "pi timed out after 120s",
+            audioURLs: [], spokenNotice: Self.notice, failed: true,
+        )
+        #expect(TalkViewModel.playback(for: r, onDevice: true) == .speak(Self.notice))
+    }
+
+    /// A Failed turn must never voice its raw technical reply (ADR 0006).
+    @Test
+    func failedTurnNeverVoicesRawReply() {
+        let r = TurnResponse(
+            transcript: "q", reply: "pi timed out after 120s",
+            audioURLs: [], spokenNotice: Self.notice, failed: true,
+        )
+        #expect(TalkViewModel.playback(for: r, onDevice: false) != .speak("pi timed out after 120s"))
+    }
+
+    /// Server-audio mode: a Failed turn plays the notice audio the server made.
+    @Test
+    func failedTurnWithServerAudioPlaysIt() {
+        let r = TurnResponse(
+            transcript: "q", reply: "err",
+            audioURLs: ["/audio/notice.m4a"], spokenNotice: Self.notice, failed: true,
+        )
+        #expect(TalkViewModel.playback(for: r, onDevice: false) == .play(["/audio/notice.m4a"]))
+    }
+
+    /// Normal turns are unchanged: on-device speaks the reply, server audio plays.
+    @Test
+    func normalOnDeviceTurnSpeaksReply() {
+        let r = TurnResponse(transcript: "q", reply: "hello", audioURLs: [])
+        #expect(TalkViewModel.playback(for: r, onDevice: true) == .speak("hello"))
+    }
+
+    @Test
+    func normalServerAudioTurnPlaysIt() {
+        let r = TurnResponse(transcript: "q", reply: "hello", audioURLs: ["/audio/x.m4a"])
+        #expect(TalkViewModel.playback(for: r, onDevice: false) == .play(["/audio/x.m4a"]))
+    }
+}
+
 // MARK: - TalkViewModel (no-drop submission)
 
 @MainActor

@@ -6,6 +6,9 @@ struct TurnResponse: Decodable, Sendable {
     let audioURL: String?
     let audioURLs: [String]?
     let note: String?
+    /// Generic spoken notice for a Failed turn (never the raw technical reply).
+    /// Present so a client that owns TTS can voice the failure. See ADR 0009.
+    let spokenNotice: String?
     let audioDegraded: Bool
     let failed: Bool
 
@@ -15,6 +18,7 @@ struct TurnResponse: Decodable, Sendable {
         case note
         case audioURL = "audio_url"
         case audioURLs = "audio_urls"
+        case spokenNotice = "spoken_notice"
         case audioDegraded = "audio_degraded"
         case failed
     }
@@ -25,6 +29,7 @@ struct TurnResponse: Decodable, Sendable {
         audioURL: String? = nil,
         audioURLs: [String]? = nil,
         note: String? = nil,
+        spokenNotice: String? = nil,
         audioDegraded: Bool = false,
         failed: Bool = false,
     ) {
@@ -33,6 +38,7 @@ struct TurnResponse: Decodable, Sendable {
         self.audioURL = audioURL
         self.audioURLs = audioURLs
         self.note = note
+        self.spokenNotice = spokenNotice
         self.audioDegraded = audioDegraded
         self.failed = failed
     }
@@ -44,6 +50,7 @@ struct TurnResponse: Decodable, Sendable {
         audioURL = try container.decodeIfPresent(String.self, forKey: .audioURL)
         audioURLs = try container.decodeIfPresent([String].self, forKey: .audioURLs)
         note = try container.decodeIfPresent(String.self, forKey: .note)
+        spokenNotice = try container.decodeIfPresent(String.self, forKey: .spokenNotice)
         audioDegraded = try container.decodeIfPresent(Bool.self, forKey: .audioDegraded) ?? false
         failed = try container.decodeIfPresent(Bool.self, forKey: .failed) ?? false
     }
