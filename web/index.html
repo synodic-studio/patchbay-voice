@@ -798,8 +798,9 @@ input[type="range"]::-webkit-slider-thumb {
       <div class="s-row no-press">
         <span class="s-label">Provider</span>
         <select class="s-select" id="set-provider">
-          <option value="say">macOS Say</option>
-          <option value="google">Google Cloud</option>
+          <option value="ondevice">On-device (browser)</option>
+          <option value="say">Server: macOS Say</option>
+          <option value="google">Server: Google Cloud</option>
         </select>
         <svg class="s-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
@@ -852,7 +853,33 @@ input[type="range"]::-webkit-slider-thumb {
           <span class="toggle-track"></span>
         </label>
       </div>
+      <div class="s-row no-press">
+        <span class="s-label">Auto-push to remote</span>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="set-auto-push">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="s-row no-press" id="branch-row" style="display:none">
+        <span class="s-label">Branch</span>
+        <input class="s-input" id="set-commit-branch" placeholder="patchbay" value="patchbay">
+      </div>
+      <div class="s-row no-press">
+        <span class="s-label">Create AGENTS.md</span>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="set-agents-md">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="s-row no-press" id="claude-md-row" style="display:none">
+        <span class="s-label">Also create CLAUDE.md</span>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="set-claude-md">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
     </div>
+    <div class="settings-footer" style="text-align:left;padding-top:0">Auto-commit and push apply only where the project supports it (a Git repo, and a remote for push).</div>
     <div class="settings-footer" id="settings-server-version"></div>
   </div>
 </div>
@@ -881,6 +908,10 @@ const DEFAULTS = {
   savePath: 'docs/patchbay/',
   model: 'small',
   autoCommit: false,
+  autoPush: false,
+  autoCommitBranch: 'patchbay',
+  createAgentsMD: false,
+  createClaudeMD: false,
   serverToken: '',
 };
 
@@ -894,7 +925,15 @@ function saveSettings() { localStorage.setItem('pvSettings', JSON.stringify(sett
 // ── State ─────────────────────────────────────────────────────────────────────
 let activeChatId = null;
 let activeChatDir = null;
-let localMessages = {};
+// Conversation is kept locally (like the iOS app's UserDefaults history) and
+// persisted so a page refresh doesn't drop the visible transcript.
+let localMessages = (() => {
+  try { return JSON.parse(localStorage.getItem('pvMessages') || '{}'); }
+  catch { return {}; }
+})();
+function saveMessages() {
+  try { localStorage.setItem('pvMessages', JSON.stringify(localMessages)); } catch {}
+}
 let keyboardMode = false;
 let audioEnabled = settings.audioResponse;
 let audioEl = null;
@@ -904,6 +943,9 @@ let micRecorder = null;
 let micChunks = [];
 let allChats = [];
 let serverVersionCache = null;
+const speechOK = 'speechSynthesis' in window;
+let ttsPrimed = false;
+let ttsUnsupportedHintShown = false;
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -993,12 +1035,14 @@ async function deleteSession(id) {
   if (!confirm('Delete this session?')) return;
   await api('DELETE', `/api/chats/${id}`).catch(e => alert(e.message));
   delete localMessages[id];
+  saveMessages();
   loadSessions();
 }
 
 async function resetSession(id) {
   await api('POST', `/api/chats/${id}/reset`).catch(e => alert(e.message));
   localMessages[id] = [];
+  saveMessages();
   if (activeChatId === id) renderMessages();
   loadSessions();
 }
@@ -1062,6 +1106,7 @@ function renderMessages() {
 function addMessage(role, text) {
   if (!localMessages[activeChatId]) localMessages[activeChatId] = [];
   localMessages[activeChatId].push({ role, text });
+  saveMessages();
   renderMessages();
 }
 
@@ -1080,6 +1125,7 @@ function setStatus(text) {
 
 // ── Mic ───────────────────────────────────────────────────────────────────────
 function micStart() {
+  primeSpeech(); // unlock on-device TTS while we still have the user gesture
   const btn = document.getElementById('mic-btn');
   if (btn.classList.contains('thinking') || btn.classList.contains('recording')) return;
   navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
@@ -1122,6 +1168,7 @@ async function sendAudio(blob, ext) {
 
 async function sendText(text) {
   if (!text.trim()) return;
+  primeSpeech(); // unlock on-device TTS while we still have the user gesture
   document.getElementById('text-input').value = '';
   addMessage('user', text);
   const btn = document.getElementById('mic-btn');
@@ -1140,21 +1187,57 @@ async function sendText(text) {
 function buildForm() {
   const fd = new FormData();
   fd.append('chat_id', activeChatId);
-  fd.append('audio_response', audioEnabled ? 'true' : 'false');
+  // On-device speech is synthesized in the browser, so don't ask the server to
+  // make audio in that mode — mirrors the iOS client (serverAudio = audioResponse && !onDevice).
+  const onDevice = settings.ttsProvider === 'ondevice';
+  const serverAudio = audioEnabled && !onDevice;
+  fd.append('audio_response', serverAudio ? 'true' : 'false');
   fd.append('chunked_audio', 'true');
-  fd.append('tts_provider', settings.ttsProvider);
+  if (!onDevice) fd.append('tts_provider', settings.ttsProvider);
   fd.append('speaking_rate', String(settings.speakingRate));
   fd.append('save_path', settings.savePath || 'docs/patchbay/');
-  fd.append('auto_commit', settings.autoCommit ? 'true' : 'false');
+  if (settings.autoCommit) fd.append('auto_commit', 'true');
+  if (settings.autoPush) fd.append('auto_push', 'true');
+  if (settings.autoCommit || settings.autoPush) {
+    fd.append('auto_commit_branch', settings.autoCommitBranch || 'patchbay');
+  }
+  if (settings.createAgentsMD) fd.append('create_agents_md', 'true');
+  if (settings.createClaudeMD) fd.append('create_claude_md', 'true');
   if (settings.model) fd.append('model', settings.model);
   return fd;
+}
+
+// Decide what a turn should voice, mirroring the iOS app's
+// playback(for:onDevice:). A Failed turn never reads its raw technical reply
+// aloud — it speaks the server's generic notice (so failures are never silent,
+// even in on-device mode). A normal reply is spoken on-device when the user
+// picked the browser voice, when the server sent no audio, or when server audio
+// degraded. See ADR 0003 / ADR 0009.
+function decidePlayback(data) {
+  const onDevice = settings.ttsProvider === 'ondevice';
+  const paths = (data.audio_urls && data.audio_urls.length)
+    ? data.audio_urls
+    : (data.audio_url ? [data.audio_url] : []);
+  if (data.failed) {
+    if (!paths.length) {
+      return data.spoken_notice ? { type: 'speak', text: data.spoken_notice } : { type: 'silent' };
+    }
+    return { type: 'play', urls: paths };
+  }
+  if (data.reply && (onDevice || !paths.length || data.audio_degraded)) {
+    return { type: 'speak', text: data.reply };
+  }
+  return paths.length ? { type: 'play', urls: paths } : { type: 'silent' };
 }
 
 function onTurnResult(data, addTranscript) {
   setStatus(null);
   if (addTranscript && data.transcript) addMessage('user', data.transcript);
   if (data.reply) addMessage('assistant', data.reply);
-  if (audioEnabled && data.audio_urls && data.audio_urls.length) playQueue(data.audio_urls);
+  if (!audioEnabled) return;
+  const pb = decidePlayback(data);
+  if (pb.type === 'speak') speakLocal(pb.text);
+  else if (pb.type === 'play') playQueue(pb.urls);
 }
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
@@ -1195,6 +1278,31 @@ function playQueue(urls) {
 function stopAudio() {
   if (audioEl) { audioEl.pause(); audioEl.src = ''; }
   audioQueue = [];
+  if (speechOK) { try { window.speechSynthesis.cancel(); } catch {} }
+}
+
+// ── On-device (Web Speech) TTS ──────────────────────────────────────────────────
+// iOS Safari only allows speechSynthesis.speak() from inside a user gesture.
+// Our reply arrives after an async network call — outside any gesture — so we
+// unlock the engine with a silent utterance during the mic-press / send tap.
+function primeSpeech() {
+  if (ttsPrimed || !speechOK) return;
+  try { window.speechSynthesis.speak(new SpeechSynthesisUtterance('')); ttsPrimed = true; } catch {}
+}
+
+function speakLocal(text) {
+  if (!speechOK) {
+    if (!ttsUnsupportedHintShown) {
+      ttsUnsupportedHintShown = true;
+      setStatus('🔇 On-device voice not supported in this browser');
+      setTimeout(() => setStatus(null), 4000);
+    }
+    return;
+  }
+  stopAudio(); // cancels any in-flight server audio and prior speech
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = Math.min(2, Math.max(0.5, Number(settings.speakingRate) || 1));
+  window.speechSynthesis.speak(u);
 }
 
 // ── Server version ────────────────────────────────────────────────────────────
@@ -1222,6 +1330,11 @@ function applySettingsToUI() {
   document.getElementById('set-save-path').value = settings.savePath;
   document.getElementById('set-server-token').value = settings.serverToken;
   document.getElementById('set-auto-commit').checked = settings.autoCommit;
+  document.getElementById('set-auto-push').checked = settings.autoPush;
+  document.getElementById('set-commit-branch').value = settings.autoCommitBranch;
+  document.getElementById('set-agents-md').checked = settings.createAgentsMD;
+  document.getElementById('set-claude-md').checked = settings.createClaudeMD;
+  updateFilesVisibility();
 
   // Model picker
   const isPreset = ['small','medium','large'].includes(settings.model);
@@ -1247,7 +1360,20 @@ document.getElementById('set-audio-resp').onchange = e => {
 };
 document.getElementById('set-save-path').onchange = e => { settings.savePath = e.target.value; saveSettings(); };
 document.getElementById('set-server-token').onchange = e => { settings.serverToken = e.target.value.trim(); saveSettings(); };
-document.getElementById('set-auto-commit').onchange = e => { settings.autoCommit = e.target.checked; saveSettings(); };
+document.getElementById('set-auto-commit').onchange = e => { settings.autoCommit = e.target.checked; saveSettings(); updateFilesVisibility(); };
+document.getElementById('set-auto-push').onchange = e => { settings.autoPush = e.target.checked; saveSettings(); updateFilesVisibility(); };
+document.getElementById('set-commit-branch').onchange = e => { settings.autoCommitBranch = e.target.value.trim() || 'patchbay'; saveSettings(); };
+document.getElementById('set-agents-md').onchange = e => { settings.createAgentsMD = e.target.checked; saveSettings(); updateFilesVisibility(); };
+document.getElementById('set-claude-md').onchange = e => { settings.createClaudeMD = e.target.checked; saveSettings(); };
+
+// Branch field shows when either git toggle is on; the CLAUDE.md sub-toggle
+// shows only once AGENTS.md is on — mirrors the iOS Settings screen.
+function updateFilesVisibility() {
+  document.getElementById('branch-row').style.display =
+    (settings.autoCommit || settings.autoPush) ? '' : 'none';
+  document.getElementById('claude-md-row').style.display =
+    settings.createAgentsMD ? '' : 'none';
+}
 
 document.getElementById('model-card').addEventListener('click', e => {
   const opt = e.target.closest('.model-option');
@@ -1282,6 +1408,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!confirm('Reset context for this session?')) return;
     await api('POST', `/api/chats/${activeChatId}/reset`).catch(e => alert(e.message));
     localMessages[activeChatId] = [];
+    saveMessages();
     renderMessages();
   };
 

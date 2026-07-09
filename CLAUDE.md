@@ -2,9 +2,9 @@
 
 Guidance for AI agents (including `pi`) working in this repo. See README.md for architecture, setup, and API details.
 
-## Web client: feature-frozen
+## Web client: at parity with iOS
 
-`web/index.html` is feature-frozen as of 2026-07-05. Bug fixes only — no new features — until the iOS app and server are stable and specced out. Do not add web-client work to a task unless explicitly asked.
+`web/index.html` was feature-frozen 2026-07-05 while the iOS app and server stabilized; the freeze was lifted 2026-07-08 and the web client brought up to parity. It now mirrors the iOS talk/settings surface: on-device (Web Speech) TTS alongside the server providers, the same failed-turn/`spoken_notice` and `audio_degraded` playback rules (a turn is never silent), auto-push + commit branch + AGENTS.md/CLAUDE.md fields, and localStorage-persisted conversation. Keep it in step with the iOS client and the `/api/talk` contract when either changes; it shares the same API.
 
 ## Spec-first workflow
 

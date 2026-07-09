@@ -161,9 +161,11 @@ pi loads the extension automatically via `--extension` on every invocation. It h
 
 ## Web Client
 
-A single-file HTML/JS/CSS app at `web/index.html`, served by the server at `GET /`. No build step. Mirrors the iOS app: sessions list, talk screen with hold-to-talk mic, keyboard fallback, settings panel. Works in any modern browser.
+A single-file HTML/JS/CSS app at `web/index.html`, served by the server at `GET /`. No build step. Mirrors the iOS app: sessions list, talk screen with hold-to-talk mic, keyboard fallback, and a settings panel with the same voice, model, and file options. Spoken replies use the browser's own **on-device voice** (Web Speech) or a server provider (macOS `say` / Google Cloud); like the iOS app, a failed turn is never silent — the client voices a short notice. The conversation is kept in the browser (localStorage) so a refresh doesn't lose it. Works in any modern browser.
 
 > **Microphone requires a secure context.** The hold-to-talk feature uses `getUserMedia`, which browsers only allow on `https://` or `localhost`. The server serves plain `http://<lan-or-tailscale-ip>:31552`, so voice input will not work over LAN or Tailscale unless you front the server with HTTPS (e.g. `tailscale serve`). Text input always works.
+>
+> **On-device voice needs a tap first.** Mobile Safari only unlocks speech synthesis inside a user gesture, so the browser voice is primed on each mic press / Send — the gesture that starts a turn unlocks the voice before that turn's reply comes back.
 
 ## iOS App
 
