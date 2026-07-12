@@ -12,11 +12,18 @@ _discover_urls() {
     echo "━━━ Patchbay Voice Server ━━━"
     echo ""
     echo "Connect your iOS app to one of these URLs:"
-    command -v ipconfig &>/dev/null && {
-        ipconfig getifaddr en0 2>/dev/null | while read ip; do [[ -n "$ip" ]] && echo "  http://$ip:$port   (Wi-Fi)"; done
-        ipconfig getifaddr en1 2>/dev/null | while read ip; do [[ -n "$ip" ]] && echo "  http://$ip:$port   (Ethernet)"; done
-    }
-    command -v tailscale &>/dev/null && { local ts=$(tailscale ip -4 2>/dev/null || true); [[ -n "$ts" ]] && echo "  http://$ts:$port     (Tailscale)"; }
+    # Discovery must never abort startup: on a host with no Ethernet,
+    # `ipconfig getifaddr en1` exits 1, which under `set -euo pipefail`
+    # would kill the wrapper before it ever exec's uvicorn. Guard every
+    # probe with `|| true`.
+    if command -v ipconfig &>/dev/null; then
+        local wifi eth
+        wifi=$(ipconfig getifaddr en0 2>/dev/null || true); [[ -n "$wifi" ]] && echo "  http://$wifi:$port   (Wi-Fi)"
+        eth=$(ipconfig getifaddr en1 2>/dev/null || true); [[ -n "$eth" ]] && echo "  http://$eth:$port   (Ethernet)"
+    fi
+    if command -v tailscale &>/dev/null; then
+        local ts; ts=$(tailscale ip -4 2>/dev/null || true); [[ -n "$ts" ]] && echo "  http://$ts:$port     (Tailscale)"
+    fi
     echo ""
     echo "Set a custom host with: VOICE_HOST=<ip> brew services restart patchbay-voice-server"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
