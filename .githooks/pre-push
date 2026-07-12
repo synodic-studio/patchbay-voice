@@ -1,0 +1,14 @@
+#!/bin/bash
+# Pre-push quality gate: run the full test suite before anything leaves the
+# machine. There is no CI, so this hook is the gate.
+#
+# Enabled per-clone (git config isn't cloned) with:
+#   git config --local core.hooksPath .githooks
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+if ! "$ROOT/scripts/test.sh"; then
+    echo ""
+    echo "push blocked: tests failed. Fix them, or override with 'git push --no-verify'." >&2
+    exit 1
+fi

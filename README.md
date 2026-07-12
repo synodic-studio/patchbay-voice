@@ -198,10 +198,16 @@ fastlane beta         # build + upload + add to internal testers
 ## Testing
 
 ```bash
-cd server && uv run pytest          # 138 server tests
+./scripts/test.sh                   # all non-iOS suites (brew wrapper + server + pi)
+cd server && uv run pytest          # 141 server tests
 node --test pi/tools.test.mts       # pi extension regression suite
+bash brew/tests/discover-urls.test.sh   # brew CLI wrapper (survives a failing interface probe)
 cd ios && tuist test                # iOS unit + UI tests
 ```
+
+`scripts/test.sh` is the gate: it's run by `.githooks/pre-push`, which blocks a
+push if any suite fails. Because git config isn't cloned, a fresh clone must
+re-enable it once with `git config --local core.hooksPath .githooks`.
 
 The server suite covers the turn state machine, the TTS fallback chain, the FIFO
 queue, failed-turn persistence, and the auto-commit/push git plumbing (against
