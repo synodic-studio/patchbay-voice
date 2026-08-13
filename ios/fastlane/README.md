@@ -31,6 +31,22 @@ Upload the already-built IPA to TestFlight (skips build)
 
 Build and upload a new beta to TestFlight
 
+### ios push_metadata
+
+```sh
+[bundle exec] fastlane ios push_metadata
+```
+
+Stage App Store metadata + screenshots on the editable version (no binary, no submit)
+
+### ios push_screenshots
+
+```sh
+[bundle exec] fastlane ios push_screenshots
+```
+
+Stage App Store screenshots only (no binary, no metadata, no submit)
+
 ### ios bump_build
 
 ```sh
