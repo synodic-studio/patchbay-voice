@@ -6,6 +6,10 @@ set -euo pipefail
 
 PB_LIBEXEC="__LIBEXEC__"
 PB_VERSION="__VERSION__"
+# The keg mirrors the repo layout (server/, pi/, web/ side by side) because the
+# server resolves pi/tools.ts, web/index.html and its assets relative to its own
+# directory. Run from server/, not from the layout root.
+PB_SERVER="$PB_LIBEXEC/server"
 
 _discover_urls() {
     local port="${VOICE_PORT:-31552}"
@@ -31,7 +35,7 @@ _discover_urls() {
 
 case "${1:-start}" in
     start)
-        cd "$PB_LIBEXEC"
+        cd "$PB_SERVER"
         export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         _discover_urls
         exec uv run uvicorn app:app \
@@ -51,7 +55,7 @@ case "${1:-start}" in
     qr)
         # Print a setup QR (and deep link) so the app can be configured by
         # scanning — no typing the URL or token. Optional arg overrides the URL.
-        cd "$PB_LIBEXEC"
+        cd "$PB_SERVER"
         export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         export PB_WIFI="$(ipconfig getifaddr en0 2>/dev/null || true)"
         command -v tailscale &>/dev/null && export PB_TAILSCALE="$(tailscale ip -4 2>/dev/null | head -1 || true)"

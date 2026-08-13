@@ -34,7 +34,7 @@ echo ""
 echo "── 2. Python imports ──"
 BREW=$(command -v brew)
 PB_PREFIX=$("$BREW" --prefix patchbay-voice-server 2>/dev/null || echo /opt/homebrew/opt/patchbay-voice-server)
-PB_LIBEXEC=$(cd "$PB_PREFIX/libexec" && pwd)
+PB_LIBEXEC=$(cd "$PB_PREFIX/libexec/server" && pwd)
 
 TEST_IMPORTS=(
     "from chats import Chat, create_chat, load_chats; print('ok')"
@@ -51,6 +51,37 @@ for stmt in "${TEST_IMPORTS[@]}"; do
         fail "import failed: ${stmt%%;*} — ${IMPORT_ERR}"
     fi
 done
+
+# ── 2b. Data paths resolve inside the keg ─────────────────────────────────────
+# Asserting the *files were installed* is not enough: config.py derives these
+# from its own location, so an install layout that differs from the repo
+# resolves them somewhere else and every check still passes. Ask config where
+# it thinks they are, then look there.
+echo ""
+echo "── 2b. Resolved data paths ──"
+cd "$PB_LIBEXEC"
+PATH_PROBE='
+import config
+for name, p in [
+    ("web/index.html", config.STATIC_DIR / "index.html"),
+    ("pi/tools.ts", config.EXTENSION_PATH),
+    ("server assets", config.ASSETS_DIR),
+]:
+    status = "ok" if p.exists() else "MISSING"
+    print(status + "\t" + name + "\t" + str(p))
+'
+PROBE_OUT=$(GOOGLE_TTS_SERVICE_ACCOUNT_JSON=test .venv/bin/python3 -c "$PATH_PROBE" 2>&1) || true
+if [[ -z "$PROBE_OUT" ]]; then
+    fail "path probe produced no output"
+fi
+while IFS=$'\t' read -r status name path; do
+    [[ -z "${status:-}" ]] && continue
+    if [[ "$status" == "ok" ]]; then
+        pass "resolves: $name → $path"
+    else
+        fail "unresolved: ${name:-?} → ${path:-$status}"
+    fi
+done <<<"$PROBE_OUT"
 
 # ── 3. Existing pytest suite ──────────────────────────────────────────────────
 echo ""
@@ -106,6 +137,15 @@ fi
 
 # Only proceed with API tests if server started
 if $SERVER_STARTED; then
+    # The web client is served off disk, so a wrong install layout shows up
+    # here as a 500 long before anyone notices in a browser.
+    ROOT_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/" 2>&1 || true)
+    if [[ "$ROOT_CODE" == "200" ]]; then
+        pass "GET / serves the web client"
+    else
+        fail "GET / returned HTTP $ROOT_CODE"
+    fi
+
     # Hit the API (empty chats list)
     RESP=$(curl -sf "http://127.0.0.1:$PORT/api/chats" 2>&1 || true)
     if echo "$RESP" | grep -q '"chats"'; then
