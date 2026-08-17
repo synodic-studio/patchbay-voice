@@ -25,7 +25,9 @@ def _default_url() -> str:
 
 
 def main() -> None:
-    url = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else _default_url()
+    args = [a for a in sys.argv[1:] if a != "--show-token"]
+    show_token = "--show-token" in sys.argv[1:]
+    url = args[0] if args and args[0] else _default_url()
     token = os.environ.get("VOICE_AUTH_TOKEN", "")
     query = urllib.parse.urlencode({"url": url, "token": token})
     link = f"patchbay-voice://setup?{query}"
@@ -34,7 +36,14 @@ def main() -> None:
     segno.make(link, error="m").terminal(compact=True)
     print(f"\n  Server: {url}")
     print(f"  Token:  {'(set)' if token else '(none — auth off)'}")
-    print(f"\n  Or paste this link into the app:\n  {link}\n")
+    # The pasteable link carries the token in the clear, so it stays redacted
+    # unless asked for. The QR still encodes the real one — that is its job,
+    # and the reason a screen share is the wrong place to print either.
+    if token and not show_token:
+        shown = link.replace(urllib.parse.quote(token, safe=""), "***")
+        print(f"\n  Or paste this link into the app (--show-token for the real one):\n  {shown}\n")
+    else:
+        print(f"\n  Or paste this link into the app:\n  {link}\n")
 
 
 if __name__ == "__main__":
