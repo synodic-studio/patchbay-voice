@@ -16,3 +16,6 @@ ios/fastlane/report.xml
 
 # pi's local runtime state (retain-queue, cursors — not project config)
 .pi/
+
+# demo settings, which name a machine's own repos and may carry a token
+scripts/demo.env
