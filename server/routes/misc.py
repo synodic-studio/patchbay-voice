@@ -10,7 +10,18 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 import asr
 from chats import _chats
-from config import ASSETS_DIR, AUDIO_DIR, DEVELOPER_DIR, PI_BIN, PI_MODEL, PI_PROVIDER, STATIC_DIR, TTS_VOICE, WHISPER_MODEL
+from config import (
+    ASSETS_DIR,
+    AUDIO_DIR,
+    DEVELOPER_DIR,
+    FORCE_COMMIT_BRANCH,
+    PI_BIN,
+    PI_MODEL,
+    PI_PROVIDER,
+    STATIC_DIR,
+    TTS_VOICE,
+    WHISPER_MODEL,
+)
 
 router = APIRouter()
 
@@ -57,6 +68,9 @@ def get_version():
         "source": SERVER_SOURCE,
         "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "pid": os.getpid(),
+        # Reported so a caller can tell where notes will land without guessing
+        # what the client is configured to send. Empty means the client decides.
+        "forced_commit_branch": FORCE_COMMIT_BRANCH,
     }
 
 

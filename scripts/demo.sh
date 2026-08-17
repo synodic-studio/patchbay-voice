@@ -233,10 +233,26 @@ if [ ! -d "$PROJECT_DIR/.git" ]; then
   exit 1
 fi
 
-VERSION=$(api GET "/api/version" | json "d['version']")
+VERSION_JSON=$(api GET "/api/version")
+VERSION=$(printf '%s' "$VERSION_JSON" | json "d['version']")
 if [ -z "$VERSION" ]; then
   warn "No server at $HOST. Start it, or pass --host."
   exit 1
+fi
+
+# A branch mismatch is invisible until the payoff slide, where it reads as the
+# demo failing. Catch it here instead: either the server pins the branch, or
+# the app's own branch field has to match.
+FORCED_BRANCH=$(printf '%s' "$VERSION_JSON" | json "d.get('forced_commit_branch','')")
+if [ "$FORCED_BRANCH" != "$DEMO_BRANCH" ]; then
+  warn "Server is not pinning the commit branch to $DEMO_BRANCH."
+  if [ -n "$FORCED_BRANCH" ]; then
+    warn "It pins '$FORCED_BRANCH'. Set DEMO_BRANCH to match, or repin the server."
+  else
+    warn "Either set the app's branch field to $DEMO_BRANCH, or restart the"
+    warn "server with VOICE_FORCE_COMMIT_BRANCH=$DEMO_BRANCH."
+  fi
+  echo
 fi
 
 CHAT_ID=$(resolve_chat)
