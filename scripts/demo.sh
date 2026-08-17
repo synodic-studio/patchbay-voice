@@ -157,15 +157,18 @@ create_chat() {
 # ---------------------------------------------------------------------------
 
 beat_harness() {
-  beat "twelve tools, and nothing else"
+  beat "how it reaches the repo"
   printf '%s  pi -p --mode json --provider litellm --model %s%s\n' "$C" "$DEMO_MODEL" "$R"
   printf '%s     %s--no-builtin-tools --no-extensions --no-skills%s\n' "$C" "$B" "$R"
   printf '%s     --extension pi/tools.ts%s\n\n' "$C" "$R"
+  say "  pi's own tools, extensions, and skills are off. This is all it has."
+  echo
   local tools
   tools=$(grep -oE 'name: "[a-z_]+"' "$ROOT/pi/tools.ts" | sed 's/name: "//;s/"//')
   printf '  %sread%s   %s\n' "$B" "$R" "$(echo "$tools" | sed -n '1,5p' | tr '\n' ' ')"
   printf '  %sgit%s    %s\n' "$B" "$R" "$(echo "$tools" | sed -n '6,11p' | tr '\n' ' ')"
-  printf '  %swrite%s  %s   %s(%s only)%s\n' "$B" "$R" "$(echo "$tools" | sed -n '12p')" "$D" "$DEMO_SAVE_PATH" "$R"
+  printf '  %swrite%s  %s   %s(%s only, enforced in the tool)%s\n' \
+    "$B" "$R" "$(echo "$tools" | sed -n '12p')" "$D" "$DEMO_SAVE_PATH" "$R"
 }
 
 # Tool calls stream to the server log during the turn. Showing them turns
@@ -175,9 +178,23 @@ start_tail() {
     warn "No server log at $DEMO_LOG — set DEMO_LOG in scripts/demo.env."
     return
   fi
-  printf '\n%s  live%s\n' "$D" "$R"
-  tail -n 0 -F "$DEMO_LOG" 2>/dev/null | awk -v g="$G" -v r="$R" '
-    /\[pi:tool\]/ { sub(/^\[pi:tool\] [^ ]+ /, ""); print "  " g "->" r " " $0; fflush() }
+  # Stages, the transcript, the tool calls, and the reply, in the order the
+  # server reaches them. The turn is otherwise a black box until it speaks.
+  tail -n 0 -F "$DEMO_LOG" 2>/dev/null | awk -v g="$G" -v y="$Y" -v b="$B" -v d="$D" -v r="$R" '
+    function wrap(s,   out, line, i, n, w) {
+      n = split(s, w, " "); line = ""; out = ""
+      for (i = 1; i <= n; i++) {
+        if (length(line) + length(w[i]) + 1 > 68) { out = out "     " line "\n"; line = w[i] }
+        else { line = (line == "" ? w[i] : line " " w[i]) }
+      }
+      return out "     " line
+    }
+    /\[pi:tool\]/      { sub(/^\[pi:tool\] [^ ]+ /, ""); print "     " g "->" r " " $0; fflush() }
+    /\[turn:transcribing\]/ { print "\n  " d "transcribing what you said" r; fflush() }
+    /\[turn:thinking\]/     { print "  " d "thinking" r; fflush() }
+    /\[turn:speaking\]/     { print "\n  " d "synthesizing speech" r; fflush() }
+    /\[turn:heard\]/   { sub(/^\[turn:heard\] [^ ]+ /, ""); print "\n  " y "you" r "\n" wrap($0) "\n"; fflush() }
+    /\[turn:said\]/    { sub(/^\[turn:said\] [^ ]+ /, ""); print "\n  " b "it" r "\n" wrap($0); fflush() }
   ' &
   TAIL_PID=$!
   # Detach it, or the shell prints "Terminated" over the next slide.
@@ -205,7 +222,7 @@ drive_turn() {
 }
 
 beat_result() {
-  beat "what it left behind"
+  beat "the branch it pushed"
   # The push is fire-and-forget so it never delays the spoken reply.
   local waited=0
   while [ $waited -lt 20 ]; do
@@ -283,7 +300,10 @@ else
   # the table that explains them, and the tail is already running when you
   # start talking.
   beat_harness
-  cue "ON THE PHONE" "Pick $DEMO_PROJECT, hold the mic, ask your question."
+  cue "ON THE PHONE" "Pick $DEMO_PROJECT, hold the mic, and ask:"
+  printf '\n%s' "$Y"
+  printf '%s' "$DEMO_PROMPT" | fold -s -w 68 | sed 's/^/     /'
+  printf '%s\n' "$R"
   start_tail
   advance "press when the phone has finished speaking"
 fi

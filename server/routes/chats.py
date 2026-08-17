@@ -4,7 +4,7 @@ import subprocess
 
 from fastapi import APIRouter, HTTPException
 
-from chats import _chats, chat_json, create_chat, delete_chat, get_turns, save_chats
+from chats import _chats, _turns, chat_json, create_chat, delete_chat, get_turns, save_chats
 from config import DEVELOPER_DIR
 
 router = APIRouter()
@@ -65,9 +65,17 @@ def close_chat(chat_id: str):
 
 @router.post("/api/chats/{chat_id}/reset")
 def reset_chat(chat_id: str):
+    """Start the conversation over: new pi session, no turns.
+
+    Clients clear their own view on reset, and they refetch turns from here on
+    every open. Keeping the turns would put the whole history back on screen
+    the next time the app was opened, which makes the reset look like it did
+    nothing.
+    """
     if chat_id not in _chats:
         raise HTTPException(404, "Chat not found")
     _chats[chat_id].pi_session_id = None
+    _turns.pop(chat_id, None)
     save_chats()
     return chat_json(_chats[chat_id])
 

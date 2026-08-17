@@ -5,7 +5,7 @@ A voice interface to the `pi` coding agent: speak to it from a phone or browser,
 ## Language
 
 **Chat**:
-The single, ongoing, cumulative conversation for one project directory — at most one per project, for as long as that project exists in the app (a deliberate choice, see docs/adr/0004). Holds all of that project's turns and, separately, a `pi_session_id` — pi's own internal session, which can be reset independently without losing the chat's turn history.
+The single, ongoing, cumulative conversation for one project directory — at most one per project, for as long as that project exists in the app (a deliberate choice, see docs/adr/0004). Holds all of that project's turns and, separately, a `pi_session_id` — pi's own internal session. Resetting a chat starts the conversation over: it drops the turns and the pi session together. Clients refetch turns on every open, so a reset that kept them would put the whole history back on screen.
 _Avoid_: session (ambiguous with pi's own session — say "chat" for our object, "pi session" for pi's)
 
 **Turn**:

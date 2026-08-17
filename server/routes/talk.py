@@ -119,6 +119,8 @@ async def talk(
 
         # Transcribe or use provided text
         t_asr = 0.0
+        if audio is not None and not (text and text.strip()):
+            _log_stage(chat_id, "transcribing")
         if text and text.strip():
             transcript = text.strip()
             failed = False
@@ -171,6 +173,8 @@ async def talk(
             return _failed_response(transcript, reply, audio_urls, audio_degraded)
 
         # Run pi
+        _log_stage(chat_id, "heard", transcript)
+        _log_stage(chat_id, "thinking")
         t1 = time.time()
         try:
             reply = await run_pi(transcript, chat, save_path=clean_save, model=model)
@@ -208,6 +212,9 @@ async def talk(
 
         # TTS — synthesize never raises for provider failures, so the
         # try/except here is only a safety net for truly unexpected bugs.
+        _log_stage(chat_id, "said", reply)
+        if want_audio:
+            _log_stage(chat_id, "speaking")
         t2 = time.time()
         audio_urls, audio_degraded, audio_paths = await _synthesize_audio(
             reply, want_audio, want_chunked, tts_provider, speaking_rate
@@ -308,6 +315,17 @@ def _failed_response(
             "failed": True,
         }
     )
+
+
+def _log_stage(chat_id: str, stage: str, detail: str = "") -> None:
+    """Announce where a turn has got to, one line per stage.
+
+    A turn is otherwise silent until it finishes, so a listener has no way to
+    tell transcription from thinking from synthesis. Detail is flattened to a
+    single line because a reply spans several.
+    """
+    flat = " ".join(detail.split())
+    print(f"[turn:{stage}] {chat_id} {flat}".rstrip(), file=sys.stderr, flush=True)
 
 
 def _truthy(val: str) -> bool:

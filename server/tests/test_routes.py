@@ -112,6 +112,20 @@ class TestChatsRoutes:
         assert r.status_code == 200
         assert chats_mod._chats[chat_id].pi_session_id is None
 
+    def test_reset_clears_turns(self, client, chat_id):
+        """Clients refetch turns on every open, so turns surviving a reset
+        would put the whole history back on screen and make the reset look
+        like it did nothing."""
+        import chats as chats_mod
+
+        chats_mod.add_turn(chat_id, "what changed?", "the auth middleware")
+        assert len(chats_mod.get_turns(chat_id)) == 1
+
+        assert client.post(f"/api/chats/{chat_id}/reset").status_code == 200
+
+        assert chats_mod.get_turns(chat_id) == []
+        assert client.get(f"/api/chats/{chat_id}/turns").json()["turns"] == []
+
     def test_create_response_has_required_fields(self, client, tmp_dev):
         r = client.post("/api/chats", json={"project_dir": "proj"})
         body = r.json()
