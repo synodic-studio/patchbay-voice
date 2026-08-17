@@ -195,11 +195,24 @@ fastlane beta         # build + upload + add to internal testers
 - **Dark graphite UI**: designed around the Patchbay Voice design system (1A Graphite)
 - **Model switching**: any LiteLLM alias, switchable from Settings
 
+## Demo
+
+`scripts/demo.sh` narrates a live turn from the terminal: the hardened pi invocation and the twelve tools it is left with, the tool calls streaming out of the server log while the agent works, and the branch it pushed afterward. Ask the question from the phone, or pass `--drive` to ask it over the API.
+
+```bash
+cp scripts/demo.env.example scripts/demo.env   # gitignored; every value has a default
+./scripts/demo.sh                              # you ask from the phone
+./scripts/demo.sh --auto                       # end to end, no interaction
+./scripts/demo.sh --cleanup                    # delete the demo branch and note
+```
+
+It reads tool calls from the server's log (`~/Library/Logs/patchbay-voice-server.log` for both the brew service and the LaunchAgent), so a server started in the foreground needs its stderr redirected there.
+
 ## Testing
 
 ```bash
 ./scripts/test.sh                   # all non-iOS suites (brew wrapper + server + pi)
-cd server && uv run pytest          # 141 server tests
+cd server && uv run pytest          # 149 server tests
 node --test pi/tools.test.mts       # pi extension regression suite
 bash brew/tests/discover-urls.test.sh   # brew CLI wrapper (survives a failing interface probe)
 cd ios && tuist test                # iOS unit + UI tests

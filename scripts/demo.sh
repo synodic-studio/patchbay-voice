@@ -38,7 +38,9 @@ DEMO_BRANCH="${DEMO_BRANCH:-patchbay-demo}"
 DEMO_MODEL="${DEMO_MODEL:-dsf}"
 DEMO_SAVE_PATH="${DEMO_SAVE_PATH:-docs/patchbay/}"
 DEMO_LOG="${DEMO_LOG:-$HOME/Library/Logs/patchbay-voice-server.log}"
-DEMO_PROMPT="${DEMO_PROMPT:-Walk me through what happens when someone taps a Patchbay Go link, from the redirect through to the app opening, and save that as a note for a new contributor.}"
+# Asking for the short version out loud matters: without it the reply runs
+# eight sentences, which is over a minute of speech on top of the turn.
+DEMO_PROMPT="${DEMO_PROMPT:-Walk me through what happens when someone taps a Patchbay Go link, from the redirect through to the app opening. Keep the spoken version short and save the full walkthrough as a note for a new contributor.}"
 PROJECT_DIR="${DEVELOPER_DIR:-$HOME/Developer}/$DEMO_PROJECT"
 
 while [ $# -gt 0 ]; do
