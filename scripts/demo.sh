@@ -11,9 +11,22 @@
 #   --host H   point at another server, default http://localhost:31552
 #   --cleanup  delete the demo branch and note, then exit
 #
-# One keypress advances a beat. Settings come from scripts/demo.env, which is
-# gitignored; see scripts/demo.env.example. Without it the defaults target
-# patchbay-go on a local server.
+# The screen shows artifacts, not narration. You do the talking. Three beats,
+# each ending in a prompt that says what pressing the key means:
+#
+#   1. The invocation and the twelve tools, then a cue to ask from the phone.
+#      The calls arrive underneath while it works.
+#      "pi's own tools are off, so are extensions and skills. It reaches this
+#       repo through twelve functions I wrote. Everything you are about to see
+#       it do is one of them. write_file cannot leave docs/patchbay."
+#      Press when the phone has finished speaking.
+#
+#   2. The branch, the note, the GitHub link.
+#      "It answered out loud and left a document. Nothing was typed."
+#
+# Settings come from scripts/demo.env, which is gitignored; see
+# scripts/demo.env.example. Without it the defaults target patchbay-go on a
+# local server, on the branch the app already commits to.
 #
 # Before demoing on a machine for the first time:
 #   1. The server is running and DEMO_PROJECT is checked out under ~/Developer.
@@ -58,15 +71,24 @@ else
   B=""; D=""; C=""; G=""; Y=""; R=""
 fi
 
-beat() { printf '\n%s%s== %s%s\n\n' "$D" "$B" "$1" "$R"; }
+beat() { printf '\n%s%s-- %s %s%s\n\n' "$D" "$B" "$1" "$(printf '%.0s-' $(seq 1 $((52 - ${#1}))))" "$R"; }
 say()  { printf '%s%s%s\n' "$D" "$1" "$R"; }
 warn() { printf '%s%s%s\n' "$Y" "$1" "$R"; }
 
+# What you do, as opposed to what the machine is doing. Kept visually apart
+# from everything else so it cannot be mistaken for output.
+cue() {
+  printf '\n%s%s   %s%s\n' "$Y" "$B" "$1" "$R"
+  printf '%s%s   %s%s\n' "$Y" "$D" "$2" "$R"
+}
+
+# Every prompt says what pressing the key means, so there is never a question
+# of whether it advances the slide or ends your turn.
 advance() {
   [ -n "$AUTO" ] && return 0
-  printf '\n%s[any key]%s' "$D" "$R"
+  printf '\n%s   [ %s ]%s' "$D" "$1" "$R"
   read -n 1 -s -r _ </dev/tty 2>/dev/null || read -r _ </dev/tty 2>/dev/null
-  printf '\r%*s\r' 12 ""
+  printf '\r%*s\r' $((${#1} + 12)) ""
 }
 
 api() {  # api <method> <path> [curl args...]
@@ -93,9 +115,15 @@ do_cleanup() {
   if git -C "$PROJECT_DIR" rev-parse --verify "refs/heads/$DEMO_BRANCH" >/dev/null 2>&1; then
     git -C "$PROJECT_DIR" branch -D "$DEMO_BRANCH"
   fi
-  if git -C "$PROJECT_DIR" ls-remote --exit-code --heads origin "$DEMO_BRANCH" >/dev/null 2>&1; then
-    git -C "$PROJECT_DIR" push origin --delete "$DEMO_BRANCH"
-  fi
+  # The server pushes fire-and-forget, so a push from the run being cleaned up
+  # can land after the delete and put the branch straight back. Check twice.
+  local pass
+  for pass in 1 2; do
+    if git -C "$PROJECT_DIR" ls-remote --exit-code --heads origin "$DEMO_BRANCH" >/dev/null 2>&1; then
+      git -C "$PROJECT_DIR" push origin --delete "$DEMO_BRANCH"
+    fi
+    [ "$pass" = "1" ] && sleep 3
+  done
   # The notes are real files on disk; the commit was built in a temp index.
   if [ -d "$PROJECT_DIR/$DEMO_SAVE_PATH" ]; then
     git -C "$PROJECT_DIR" ls-files --error-unmatch "$DEMO_SAVE_PATH" >/dev/null 2>&1 \
@@ -129,27 +157,15 @@ create_chat() {
 # ---------------------------------------------------------------------------
 
 beat_harness() {
-  beat "What the agent is allowed to be"
-  say "Every turn shells out to pi with the default harness switched off."
-  echo
-  printf '%s$ pi -p --mode json --provider litellm --model %s%s\n' "$C" "$DEMO_MODEL" "$R"
+  beat "twelve tools, and nothing else"
+  printf '%s  pi -p --mode json --provider litellm --model %s%s\n' "$C" "$DEMO_MODEL" "$R"
   printf '%s     %s--no-builtin-tools --no-extensions --no-skills%s\n' "$C" "$B" "$R"
-  printf '%s     --extension pi/tools.ts%s\n' "$C" "$R"
-  echo
-  say "Those three flags drop pi's own tools, any globally installed"
-  say "extension, and every skill on this machine. What is left is one file:"
-  echo
+  printf '%s     --extension pi/tools.ts%s\n\n' "$C" "$R"
   local tools
   tools=$(grep -oE 'name: "[a-z_]+"' "$ROOT/pi/tools.ts" | sed 's/name: "//;s/"//')
-  printf '  %sread / search%s   %s\n' "$B" "$R" "$(echo "$tools" | sed -n '1,5p' | tr '\n' ' ')"
-  printf '  %sgit history%s     %s\n' "$B" "$R" "$(echo "$tools" | sed -n '6,11p' | tr '\n' ' ')"
-  printf '  %swrite%s           %s\n' "$B" "$R" "$(echo "$tools" | sed -n '12p')"
-  echo
-  say "Twelve functions. Every one takes explicit arguments and shells out"
-  say "through an argv array, so a transcription that happens to contain"
-  say "'&&' or '\$()' is inert. Reads are scoped to the project. write_file"
-  say "is clamped to $DEMO_SAVE_PATH at the tool layer, not in the prompt."
-  say "There is no shell tool, so there is no way out."
+  printf '  %sread%s   %s\n' "$B" "$R" "$(echo "$tools" | sed -n '1,5p' | tr '\n' ' ')"
+  printf '  %sgit%s    %s\n' "$B" "$R" "$(echo "$tools" | sed -n '6,11p' | tr '\n' ' ')"
+  printf '  %swrite%s  %s   %s(%s only)%s\n' "$B" "$R" "$(echo "$tools" | sed -n '12p')" "$D" "$DEMO_SAVE_PATH" "$R"
 }
 
 # Tool calls stream to the server log during the turn. Showing them turns
@@ -159,7 +175,7 @@ start_tail() {
     warn "No server log at $DEMO_LOG — set DEMO_LOG in scripts/demo.env."
     return
   fi
-  printf '\n%s%s-- live from %s%s\n\n' "$D" "$B" "$DEMO_LOG" "$R"
+  printf '\n%s  live%s\n' "$D" "$R"
   tail -n 0 -F "$DEMO_LOG" 2>/dev/null | awk -v g="$G" -v r="$R" '
     /\[pi:tool\]/ { sub(/^\[pi:tool\] [^ ]+ /, ""); print "  " g "->" r " " $0; fflush() }
   ' &
@@ -189,7 +205,7 @@ drive_turn() {
 }
 
 beat_result() {
-  beat "What it left behind"
+  beat "what it left behind"
   # The push is fire-and-forget so it never delays the spoken reply.
   local waited=0
   while [ $waited -lt 20 ]; do
@@ -197,29 +213,22 @@ beat_result() {
     sleep 1; waited=$((waited + 1))
   done
 
-  printf '%s$ git log --oneline -1 %s%s\n' "$C" "$DEMO_BRANCH" "$R"
-  git -C "$PROJECT_DIR" log --oneline -1 "$DEMO_BRANCH" 2>/dev/null || warn "no $DEMO_BRANCH branch yet"
-  echo
+  printf '%s  $ git log --oneline -1 %s%s\n' "$C" "$DEMO_BRANCH" "$R"
+  git -C "$PROJECT_DIR" log --oneline -1 "$DEMO_BRANCH" 2>/dev/null | sed 's/^/  /' \
+    || warn "  no $DEMO_BRANCH branch yet"
   local note
   note=$(git -C "$PROJECT_DIR" show --pretty=format: --name-only "$DEMO_BRANCH" 2>/dev/null | grep -v '^$' | head -1)
   if [ -n "$note" ]; then
-    printf '%s$ git show --name-only %s%s\n' "$C" "$DEMO_BRANCH" "$R"
-    printf '  %s\n\n' "$note"
-    say "Pushed, so it is already on GitHub:"
-    printf '\n  %shttps://github.com/%s/blob/%s/%s%s\n' "$B" "$DEMO_REPO" "$DEMO_BRANCH" "$note" "$R"
-    echo
-    say "It answered out loud and left a document. Pick it up from a laptop,"
-    say "or hand the branch to a cloud agent. Nothing was typed on a keyboard."
+    printf '\n  %s%s%s\n' "$B" "$note" "$R"
+    printf '  %shttps://github.com/%s/blob/%s/%s%s\n' "$D" "$DEMO_REPO" "$DEMO_BRANCH" "$note" "$R"
   else
-    warn "Nothing committed to $DEMO_BRANCH. Check auto-commit in the app's settings."
+    warn "  Nothing committed to $DEMO_BRANCH. Check auto-commit in the app."
   fi
 }
 
 beat_close() {
-  beat "Patchbay Voice"
-  say "iOS app and a single-file web client, same API. The server runs"
-  say "wherever your code is: brew, Docker, or a checkout."
-  echo
+  beat "patchbay voice"
+  printf '  iOS app, web client, same API. Server runs on brew, Docker, or a checkout.\n\n'
   printf '  %sgithub.com/synodic-studio/patchbay-voice%s\n' "$D" "$R"
 }
 
@@ -260,7 +269,7 @@ REPLY_FILE=$(mktemp)
 TAIL_PID=""
 trap 'stop_tail; rm -f "$REPLY_FILE"' EXIT
 
-printf '\n%sPatchbay Voice%s  %s%s · %s · %s%s\n' "$B" "$R" "$D" "$HOST" "$VERSION" "$DEMO_PROJECT" "$R"
+printf '\n  %sPatchbay Voice%s  %s%s · %s%s\n' "$B" "$R" "$D" "$DEMO_PROJECT" "$VERSION" "$R"
 
 DRIVE_PID=""
 if [ -n "$DRIVE" ]; then
@@ -270,25 +279,24 @@ if [ -n "$DRIVE" ]; then
   DRIVE_PID=$!
   wait "$DRIVE_PID"
 else
-  # The tail starts before the question does, so the first tool call lands
-  # while you are still holding the phone.
-  beat "Ask it something"
-  say "Hold the mic and ask. This is listening for what it reaches for."
-  start_tail
-  advance
+  # The tools go up before the question does, so the calls arrive underneath
+  # the table that explains them, and the tail is already running when you
+  # start talking.
   beat_harness
-  advance
+  cue "ON THE PHONE" "Pick $DEMO_PROJECT, hold the mic, ask your question."
+  start_tail
+  advance "press when the phone has finished speaking"
 fi
 stop_tail
 
 if [ -s "$REPLY_FILE" ]; then
-  beat "What it said"
+  beat "what it said"
   python3 -c "import json;print(json.load(open('$REPLY_FILE'))['reply'])" 2>/dev/null \
-    || warn "no reply in response"
-  advance
+    | fold -s -w 74 | sed 's/^/  /' || warn "no reply in response"
+  advance "press for the branch"
 fi
 
 beat_result
-advance
+advance "press to finish"
 beat_close
 echo
