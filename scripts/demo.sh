@@ -309,13 +309,7 @@ else
 fi
 stop_tail
 
-if [ -s "$REPLY_FILE" ]; then
-  beat "what it said"
-  python3 -c "import json;print(json.load(open('$REPLY_FILE'))['reply'])" 2>/dev/null \
-    | fold -s -w 74 | sed 's/^/  /' || warn "no reply in response"
-  advance "press for the branch"
-fi
-
+# The reply already came through the live feed, so it is not reprinted here.
 beat_result
 advance "press to finish"
 beat_close
