@@ -127,6 +127,33 @@ def _format_tool_call(ev: dict) -> str | None:
     return f"{name}({rendered})"
 
 
+def _format_tool_refusal(ev: dict) -> str | None:
+    """Render a refused tool call as one compact line, or None.
+
+    A guardrail is only observable if the blocked call appears next to the ones
+    that went through; otherwise the log shows an attempt and never a verdict.
+    """
+    if ev.get("type") != "tool_execution_end" or not ev.get("isError"):
+        return None
+    name = ev.get("toolName") or "?"
+    result = ev.get("result")
+    text = ""
+    if isinstance(result, dict):
+        content = result.get("content")
+        if isinstance(content, list):
+            text = " ".join(
+                c.get("text", "") for c in content if isinstance(c, dict)
+            )
+        if not text.strip():
+            text = str(result.get("error") or result.get("message") or "")
+    elif result is not None:
+        text = str(result)
+    text = " ".join(text.split())
+    if len(text) > 80:
+        text = text[:77] + "..."
+    return f"{name}: {text}" if text else name
+
+
 def _echo_tool_call(line: str, chat_id: str) -> None:
     line = line.strip()
     if not line:
@@ -140,6 +167,10 @@ def _echo_tool_call(line: str, chat_id: str) -> None:
     call = _format_tool_call(ev)
     if call:
         print(f"[pi:tool] {chat_id} {call}", file=sys.stderr, flush=True)
+        return
+    refusal = _format_tool_refusal(ev)
+    if refusal:
+        print(f"[pi:tool-refused] {chat_id} {refusal}", file=sys.stderr, flush=True)
 
 
 def _find_error(events: list[dict]) -> str | None:

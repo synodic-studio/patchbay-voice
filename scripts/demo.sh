@@ -11,7 +11,7 @@
 #   --host H   point at another server, default http://localhost:31552
 #   --cleanup  delete the demo branch and note, then exit
 #
-# The screen shows artifacts, not narration. You do the talking. Three beats,
+# The screen shows artifacts, not narration. You do the talking. Two beats,
 # each ending in a prompt that says what pressing the key means:
 #
 #   1. The invocation and the twelve tools, then a cue to ask from the phone.
@@ -71,9 +71,9 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -t 1 ]; then
-  B=$'\033[1m'; D=$'\033[2m'; C=$'\033[36m'; G=$'\033[32m'; Y=$'\033[33m'; R=$'\033[0m'
+  B=$'\033[1m'; D=$'\033[2m'; C=$'\033[36m'; G=$'\033[32m'; Y=$'\033[33m'; E=$'\033[31m'; R=$'\033[0m'
 else
-  B=""; D=""; C=""; G=""; Y=""; R=""
+  B=""; D=""; C=""; G=""; Y=""; E=""; R=""
 fi
 
 beat() { printf '\n%s%s-- %s %s%s\n\n' "$D" "$B" "$1" "$(printf '%.0s-' $(seq 1 $((52 - ${#1}))))" "$R"; }
@@ -189,7 +189,7 @@ start_tail() {
   fi
   # Stages, the transcript, the tool calls, and the reply, in the order the
   # server reaches them. The turn is otherwise a black box until it speaks.
-  tail -n 0 -F "$DEMO_LOG" 2>/dev/null | awk -v g="$G" -v y="$Y" -v b="$B" -v d="$D" -v r="$R" '
+  tail -n 0 -F "$DEMO_LOG" 2>/dev/null | awk -v g="$G" -v y="$Y" -v b="$B" -v d="$D" -v e="$E" -v r="$R" '
     function wrap(s,   out, line, i, n, w) {
       n = split(s, w, " "); line = ""; out = ""
       for (i = 1; i <= n; i++) {
@@ -199,11 +199,15 @@ start_tail() {
       return out "     " line
     }
     /\[pi:tool\]/      { sub(/^\[pi:tool\] [^ ]+ /, ""); print "     " g "->" r " " $0; fflush() }
+    # A call that hit the wall, so the sandbox is on screen rather than claimed.
+    /\[pi:tool-refused\]/ { sub(/^\[pi:tool-refused\] [^ ]+ /, ""); print "     " e "-|" r " " e $0 r; fflush() }
     /\[turn:transcribing\]/ { print "\n  " d "transcribing what you said" r; fflush() }
     /\[turn:thinking\]/     { print "  " d "thinking" r; fflush() }
     /\[turn:speaking\]/     { print "\n  " d "synthesizing speech" r; fflush() }
     /\[turn:heard\]/   { sub(/^\[turn:heard\] [^ ]+ /, ""); print "\n  " y "you" r "\n" wrap($0) "\n"; fflush() }
     /\[turn:said\]/    { sub(/^\[turn:said\] [^ ]+ /, ""); print "\n  " b "it" r "\n" wrap($0); fflush() }
+    # Ends the beat on numbers instead of on the last word it spoke.
+    /^\[turn\] /       { i = index($0, "asr="); if (i) print "  " d substr($0, i) r; fflush() }
   ' &
   TAIL_PID=$!
   # Detach it, or the shell prints "Terminated" over the next slide.
@@ -212,6 +216,9 @@ start_tail() {
 
 stop_tail() {
   [ -z "$TAIL_PID" ] && return
+  # tail -F polls once a second, so a driven run outruns the last lines and
+  # cuts the timings off the end. Live, the keypress has already waited longer.
+  [ -n "$DRIVE" ] && sleep 2
   kill "$TAIL_PID" 2>/dev/null
   pkill -f "tail -n 0 -F $DEMO_LOG" 2>/dev/null
   TAIL_PID=""
