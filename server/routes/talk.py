@@ -15,7 +15,13 @@ from fastapi.responses import JSONResponse
 import asr as asr_mod
 import tts as tts_mod
 from chats import _chats, add_turn, save_chats
-from config import AUDIO_DIR, DEVELOPER_DIR, FORCE_TTS, ONDEVICE_PROJECTS
+from config import (
+    AUDIO_DIR,
+    DEVELOPER_DIR,
+    FORCE_COMMIT_BRANCH,
+    FORCE_TTS,
+    ONDEVICE_PROJECTS,
+)
 from pi_runner import run_pi
 
 router = APIRouter()
@@ -74,6 +80,10 @@ async def talk(
     # A server may pin the TTS provider (the demo forces Google for a good voice)
     if FORCE_TTS:
         tts_provider = FORCE_TTS
+
+    # ...and the branch notes land on, so the phone never has to be retyped.
+    if FORCE_COMMIT_BRANCH:
+        auto_commit_branch = FORCE_COMMIT_BRANCH
 
     # Serialize overlapping turns on the same chat
     if chat_id not in _talk_locks:

@@ -922,6 +922,38 @@ class TestTalkAutoCommit:
         staged = self._git_out(proj, "diff", "--cached", "--name-only")
         assert staged == "unrelated.txt"
 
+    def test_forced_branch_overrides_the_client(self, client, chat_id, tmp_dev):
+        """The branch is a free-text field in the app, so a locked-down server
+        can route notes itself rather than trusting what a phone sends."""
+        proj = tmp_dev / "proj"
+        self._init_repo(proj)
+
+        def fake_pi(*a, **kw):
+            (proj / "docs" / "patchbay").mkdir(parents=True, exist_ok=True)
+            (proj / "docs" / "patchbay" / "note.md").write_text("a note\n")
+            return "ok"
+
+        with (
+            patch("routes.talk.run_pi", new_callable=AsyncMock, side_effect=fake_pi),
+            patch("routes.talk.FORCE_COMMIT_BRANCH", "patchbay-demo"),
+        ):
+            r = client.post(
+                "/api/talk",
+                data={
+                    "chat_id": chat_id,
+                    "text": "hi",
+                    "audio_response": "false",
+                    "auto_commit": "true",
+                    "auto_commit_branch": "whatever-the-phone-says",
+                },
+            )
+        assert r.status_code == 200
+
+        tree_files = self._git_out(proj, "ls-tree", "-r", "--name-only", "patchbay-demo")
+        assert "docs/patchbay/note.md" in tree_files
+        branches = self._git_out(proj, "branch", "--format=%(refname:short)")
+        assert "whatever-the-phone-says" not in branches
+
     def test_auto_commit_advances_existing_branch(self, client, chat_id, tmp_dev):
         proj = tmp_dev / "proj"
         self._init_repo(proj)

@@ -85,6 +85,7 @@ Runs on port 31552 by default. Configure with environment variables:
 | `LOCAL_TTS_ENGINE` | *(auto)* | Force the local engine: `say`, `piper`, or `espeak` (auto-detects when unset) |
 | `VOICE_FORCE_MODEL` | *(unset)* | Pin the pi model server-side, ignoring the client's request (demo / locked-down servers) |
 | `VOICE_FORCE_TTS` | *(unset)* | Pin the TTS provider server-side (e.g. `google`), ignoring the client's request |
+| `VOICE_FORCE_COMMIT_BRANCH` | *(unset)* | Pin the auto-commit branch server-side, ignoring the client's request |
 | `VOICE_ONDEVICE_PROJECTS` | *(unset)* | Comma-separated project dirs for which the server returns no audio, so a capable client speaks on-device |
 | `VOICE_VERSION` | *(git/BUILD_INFO)* | Version string reported at `/api/version` (stamp a deploy that isn't a git checkout) |
 
@@ -212,7 +213,7 @@ It reads tool calls from the server's log (`~/Library/Logs/patchbay-voice-server
 
 ```bash
 ./scripts/test.sh                   # all non-iOS suites (brew wrapper + server + pi)
-cd server && uv run pytest          # 149 server tests
+cd server && uv run pytest          # 150 server tests
 node --test pi/tools.test.mts       # pi extension regression suite
 bash brew/tests/discover-urls.test.sh   # brew CLI wrapper (survives a failing interface probe)
 cd ios && tuist test                # iOS unit + UI tests

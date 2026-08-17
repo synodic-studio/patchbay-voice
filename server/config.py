@@ -88,6 +88,11 @@ def get_google_tts_credentials() -> str:
 # though the app defaults to local `say`.
 FORCE_TTS = environ.get("VOICE_FORCE_TTS", "").strip()
 
+# Force the auto-commit branch server-side regardless of what the client sends.
+# The branch is a free-text field in the app, so a demo or locked-down server
+# can route notes to a known branch without anyone retyping it on a phone.
+FORCE_COMMIT_BRANCH = environ.get("VOICE_FORCE_COMMIT_BRANCH", "").strip()
+
 # Projects for which the server produces NO audio, so a client that supports it
 # (the iOS app) speaks the reply with its own on-device voice. The demo uses one
 # project on server-side Google TTS and another on the on-device voice so a
