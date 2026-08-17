@@ -74,10 +74,12 @@ final class TalkViewModel {
         inFlightCount += 1
         Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
+            // The captured turn shows the write boundary rather than a code
+            // edit: the agent reads the repo and can only write to its notes.
             _appendTurn(TurnItem(
-                transcript: "What changed in the last commit?",
-                reply: "I wrapped the webhook call in a retry with backoff, so a flaky network gets a few"
-                    + " attempts, from about a second up to thirty, before it gives up.",
+                transcript: "Save that as a note I can read later.",
+                reply: "Saved to docs/patchbay/request-ordering.md. That folder is the only place I can"
+                    + " write, so nothing else in the repo changed.",
             ), chat: chat)
             inFlightCount -= 1
         }

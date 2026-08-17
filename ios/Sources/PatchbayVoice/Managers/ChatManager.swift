@@ -70,9 +70,9 @@ final class ChatManager {
                     + " replies back. The core is a FastAPI webhook and a small queue that keeps requests in order.",
             ),
             TurnItem(
-                transcript: "Add a loading spinner to the submit button while it waits.",
-                reply: "Done. The submit button now shows a spinner and disables itself while a request is in"
-                    + " flight, then re-enables once the reply comes back.",
+                transcript: "How does it keep two messages from interleaving?",
+                reply: "Each chat holds its own lock, so a second message waits for the first to finish"
+                    + " rather than running alongside it. Nothing is dropped and nothing is merged.",
             ),
         ]
         if let data = try? JSONEncoder().encode(history) {
