@@ -79,6 +79,67 @@ class TestParseEvents:
         assert len(_parse_events(lines)) == 2
 
 
+class TestFormatToolCall:
+    """Tool calls are echoed to the log while a turn runs, so the shapes pi
+    actually emits have to render, and everything else has to stay silent."""
+
+    def test_path_argument_is_the_label(self):
+        from pi_runner import _format_tool_call
+
+        ev = {
+            "type": "tool_execution_start",
+            "toolCallId": "call_00_x",
+            "toolName": "read_file",
+            "args": {"path": "src/worker.js"},
+        }
+        assert _format_tool_call(ev) == "read_file(src/worker.js)"
+
+    def test_depth_argument(self):
+        from pi_runner import _format_tool_call
+
+        ev = {"type": "tool_execution_start", "toolName": "tree", "args": {"depth": 3}}
+        assert _format_tool_call(ev) == "tree(3)"
+
+    def test_no_arguments(self):
+        from pi_runner import _format_tool_call
+
+        ev = {"type": "tool_execution_start", "toolName": "list_dir", "args": {}}
+        assert _format_tool_call(ev) == "list_dir()"
+
+    def test_unrecognized_arguments_are_rendered_and_capped(self):
+        from pi_runner import _format_tool_call
+
+        ev = {
+            "type": "tool_execution_start",
+            "toolName": "write_file",
+            "args": {"contents": "x" * 200},
+        }
+        rendered = _format_tool_call(ev)
+        assert rendered.startswith("write_file(contents=xxx")
+        assert rendered.endswith("...)")
+        assert len(rendered) < 90
+
+    def test_other_event_types_are_ignored(self):
+        from pi_runner import _format_tool_call
+
+        assert _format_tool_call({"type": "message_update", "toolName": "read_file"}) is None
+        assert _format_tool_call({"type": "tool_execution_end", "toolName": "read_file"}) is None
+
+    def test_echo_survives_garbage_lines(self, capsys):
+        from pi_runner import _echo_tool_call
+
+        _echo_tool_call("not json at all", "chat-1")
+        _echo_tool_call("[1, 2, 3]", "chat-1")
+        _echo_tool_call("", "chat-1")
+        _echo_tool_call(
+            json.dumps(
+                {"type": "tool_execution_start", "toolName": "git_log", "args": {"ref": "HEAD"}}
+            ),
+            "chat-1",
+        )
+        assert capsys.readouterr().err == "[pi:tool] chat-1 git_log(HEAD)\n"
+
+
 class TestFindSessionId:
     def test_found(self):
         from pi_runner import _find_session_id
@@ -118,6 +179,10 @@ def _text_block(text: str) -> dict:
 
 def _thinking_block(thinking: str) -> dict:
     return {"type": "thinking", "thinking": thinking, "thinkingSignature": "sig"}
+
+
+def _tool_call_block(name: str) -> dict:
+    return {"type": "toolCall", "toolCallId": f"call_{name}", "toolName": name, "args": {}}
 
 
 class TestExtractText:
@@ -171,6 +236,46 @@ class TestExtractText:
             )
         ]
         assert _extract_text(events) == "Part one.\nPart two."
+
+    def test_narration_between_tool_calls_is_not_spoken(self):
+        """A multi-tool turn narrates as it works. Only the message that
+        ended the turn is the reply; the rest is search, not answer."""
+        from pi_runner import _extract_text
+
+        events = [
+            _agent_end(
+                [
+                    {"role": "user", "content": [_text_block("how does this work?")]},
+                    _assistant_msg(_thinking_block("plan"), _tool_call_block("tree")),
+                    _assistant_msg(
+                        _text_block("Let me read the key files."),
+                        _tool_call_block("read_file"),
+                    ),
+                    _assistant_msg(
+                        _text_block("Let me check the docs too."),
+                        _tool_call_block("read_file"),
+                    ),
+                    _assistant_msg(_thinking_block("done"), _text_block("Here's the answer.")),
+                ]
+            )
+        ]
+        assert _extract_text(events) == "Here's the answer."
+
+    def test_falls_back_when_every_message_called_a_tool(self):
+        """A turn that ended mid-tool-use still has to say something."""
+        from pi_runner import _extract_text
+
+        events = [
+            _agent_end(
+                [
+                    _assistant_msg(
+                        _text_block("Let me look at that."),
+                        _tool_call_block("read_file"),
+                    ),
+                ]
+            )
+        ]
+        assert _extract_text(events) == "Let me look at that."
 
     def test_skips_user_messages(self):
         from pi_runner import _extract_text
@@ -411,11 +516,11 @@ class TestPiCommandLine:
     """Tests that the pi subprocess command line is built correctly.
 
     We run_pi with a real-looking Chat and inspect the cmd list passed to
-    subprocess.run, which we intercept with a mock.
+    subprocess.Popen, which we intercept with a mock.
     """
 
     def _run_and_capture_cmd(self, chat, *, model="", save_path="docs/patchbay/"):
-        """Call run_pi and return the cmd list from the mocked subprocess.run."""
+        """Call run_pi and return the cmd list from the mocked subprocess.Popen."""
         import sys
         from unittest.mock import patch
 
@@ -424,14 +529,32 @@ class TestPiCommandLine:
 
         captured = {}
 
-        def _fake_run(cmd, **kwargs):
+        class _FakeProc:
+            """Stands in for a streaming pi: stdout is iterated line by line."""
+
+            def __init__(self, cmd):
+                import io
+
+                self.args = cmd
+                self.stdout = io.StringIO(
+                    '{"type":"session","id":"sess-1"}\n'
+                    '{"type":"agent_end","messages":[{"role":"assistant",'
+                    '"content":[{"type":"text","text":"ok"}]}]}\n'
+                )
+                self.returncode = 0
+
+            def wait(self):
+                return self.returncode
+
+            def kill(self):
+                pass
+
+        def _fake_popen(cmd, **kwargs):
             captured["cmd"] = cmd
-            # Return something that looks like a valid CompletedProcess
-            import subprocess
-            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout='{"type":"session","id":"sess-1"}\n{"type":"agent_end","messages":[{"role":"assistant","content":[{"type":"text","text":"ok"}]}]}', stderr="")
+            return _FakeProc(cmd)
 
         with (
-            patch("pi_runner.subprocess.run", side_effect=_fake_run),
+            patch("pi_runner.subprocess.Popen", side_effect=_fake_popen),
             patch("pi_runner.save_chats", lambda: None),
         ):
             try:

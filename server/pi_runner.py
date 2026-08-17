@@ -4,6 +4,8 @@ import asyncio
 import json
 import subprocess
 import sys
+import tempfile
+import threading
 
 from fastapi import HTTPException
 
@@ -57,24 +59,87 @@ def _find_session_id(events: list[dict]) -> str | None:
     return None
 
 
+def _message_text(msg: dict) -> str:
+    content = msg.get("content", [])
+    if not isinstance(content, list):
+        return ""
+    parts = [
+        b.get("text", "")
+        for b in content
+        if isinstance(b, dict) and b.get("type") == "text" and b.get("text")
+    ]
+    return "\n".join(parts).strip()
+
+
+def _calls_a_tool(msg: dict) -> bool:
+    content = msg.get("content", [])
+    if not isinstance(content, list):
+        return False
+    return any(isinstance(b, dict) and b.get("type") == "toolCall" for b in content)
+
+
 def _extract_text(events: list[dict]) -> str:
+    """The spoken reply is the last assistant message that didn't call a tool.
+
+    A multi-tool turn narrates between calls ("Let me read the key files"),
+    and those narrations are assistant text blocks like any other. Joining
+    them all makes the phone speak the whole search before the answer, so
+    only the message that ended the turn counts as the reply.
+    """
     for ev in reversed(events):
         if ev.get("type") != "agent_end" or ev.get("willRetry"):
             continue
-        parts: list[str] = []
-        for msg in ev.get("messages", []):
-            if msg.get("role") != "assistant":
+        assistant = [m for m in ev.get("messages", []) if m.get("role") == "assistant"]
+        for msg in reversed(assistant):
+            if _calls_a_tool(msg):
                 continue
-            content = msg.get("content", [])
-            if isinstance(content, list):
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        text = block.get("text", "")
-                        if text:
-                            parts.append(text)
-        if parts:
-            return "\n".join(parts).strip()
+            text = _message_text(msg)
+            if text:
+                return text
+        # No tool-free message produced text (a turn that ended mid-tool-use);
+        # fall back to whatever the assistant last said rather than nothing.
+        for msg in reversed(assistant):
+            text = _message_text(msg)
+            if text:
+                return text
     return ""
+
+
+def _format_tool_call(ev: dict) -> str | None:
+    """Render a tool_execution_start event as one compact line, or None.
+
+    pi streams a JSON event per line, so tool calls are visible while the turn
+    is still running. Echoing them is what makes a live turn observable from
+    the server log instead of a black box that eventually speaks.
+    """
+    if ev.get("type") != "tool_execution_start":
+        return None
+    name = ev.get("toolName") or "?"
+    args = ev.get("args") if isinstance(ev.get("args"), dict) else {}
+    for key in ("path", "pattern", "query", "ref", "branch", "depth"):
+        if key in args:
+            return f"{name}({args[key]})"
+    if not args:
+        return f"{name}()"
+    rendered = ", ".join(f"{k}={v}" for k, v in args.items())
+    if len(rendered) > 60:
+        rendered = rendered[:57] + "..."
+    return f"{name}({rendered})"
+
+
+def _echo_tool_call(line: str, chat_id: str) -> None:
+    line = line.strip()
+    if not line:
+        return
+    try:
+        ev = json.loads(line)
+    except json.JSONDecodeError:
+        return
+    if not isinstance(ev, dict):
+        return
+    call = _format_tool_call(ev)
+    if call:
+        print(f"[pi:tool] {chat_id} {call}", file=sys.stderr, flush=True)
 
 
 def _find_error(events: list[dict]) -> str | None:
@@ -132,12 +197,41 @@ async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/
         cmd.extend(["--extension", str(EXTENSION_PATH)])
         cmd.append(safe_text)
 
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env, timeout=PI_TIMEOUT)
-            return result.stdout, result.stderr, result.returncode
-        except subprocess.TimeoutExpired:
-            print(f"[pi] timeout after {PI_TIMEOUT}s chat={chat.id}", file=sys.stderr)
-            raise HTTPException(504, f"pi timed out after {PI_TIMEOUT}s")
+        # Read stdout as it arrives rather than with subprocess.run, so tool
+        # calls reach the log during the turn instead of after it. stderr goes
+        # to a temp file so a chatty pi can't fill a pipe we aren't draining.
+        # A watchdog enforces PI_TIMEOUT: a silent hang would otherwise block
+        # on readline forever.
+        with tempfile.TemporaryFile("w+") as err_file:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=err_file, text=True, cwd=cwd, env=env
+            )
+            timed_out = threading.Event()
+
+            def _kill() -> None:
+                timed_out.set()
+                proc.kill()
+
+            watchdog = threading.Timer(PI_TIMEOUT, _kill)
+            watchdog.start()
+            chunks: list[str] = []
+            try:
+                if proc.stdout is not None:
+                    for line in proc.stdout:
+                        chunks.append(line)
+                        _echo_tool_call(line, chat.id)
+                proc.wait()
+            finally:
+                watchdog.cancel()
+                if proc.stdout is not None:
+                    proc.stdout.close()
+
+            if timed_out.is_set():
+                print(f"[pi] timeout after {PI_TIMEOUT}s chat={chat.id}", file=sys.stderr)
+                raise HTTPException(504, f"pi timed out after {PI_TIMEOUT}s")
+
+            err_file.seek(0)
+            return "".join(chunks), err_file.read(), proc.returncode
 
     stdout, stderr, rc = await asyncio.to_thread(_run)
 
