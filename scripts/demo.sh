@@ -52,6 +52,11 @@ DEMO_MODEL="${DEMO_MODEL:-dsf}"
 DEMO_SAVE_PATH="${DEMO_SAVE_PATH:-docs/patchbay/}"
 DEMO_LOG="${DEMO_LOG:-$HOME/Library/Logs/patchbay-voice-server.log}"
 DEMO_PROMPT="${DEMO_PROMPT:-Walk me through what happens when someone taps a Patchbay Go link, from the redirect through to the app opening, and save that as a note for a new contributor.}"
+# Shown on the cue screen to pick from, one per line. Only --drive and --auto
+# use DEMO_PROMPT; live you say one of these.
+DEMO_ASKS="${DEMO_ASKS:-How does a link get from a chat message to the app opening?
+What does the raw route refuse to redirect to, and why?
+How does the key handoff keep the server from seeing the secret?}"
 PROJECT_DIR="${DEVELOPER_DIR:-$HOME/Developer}/$DEMO_PROJECT"
 
 while [ $# -gt 0 ]; do
@@ -83,11 +88,15 @@ cue() {
 }
 
 # Every prompt says what pressing the key means, so there is never a question
-# of whether it advances the slide or ends your turn.
+# of whether it advances the slide or ends your turn. Keys come from fd 3, the
+# terminal opened at startup, so a redirected stdin does not swallow them.
 advance() {
   [ -n "$AUTO" ] && return 0
   printf '\n%s   [ %s ]%s' "$D" "$1" "$R"
-  read -n 1 -s -r _ </dev/tty 2>/dev/null || read -r _ </dev/tty 2>/dev/null
+  if ! read -n 1 -s -r _ <&3; then
+    printf '\n'
+    warn "  Lost the terminal, so nothing is waiting for you any more."
+  fi
   printf '\r%*s\r' $((${#1} + 12)) ""
 }
 
@@ -253,6 +262,20 @@ beat_close() {
 
 [ -n "$CLEANUP" ] && { do_cleanup; exit 0; }
 
+# Without a terminal every keypress returns instantly and the whole deck runs
+# in one breath, which looks exactly like the demo failing. Say so and stop.
+if [ -z "$AUTO" ]; then
+  # Tested in a subshell first: a failed `exec` redirect prints its own error
+  # before any 2>/dev/null on the same line can take effect.
+  if (exec 3</dev/tty) 2>/dev/null; then
+    exec 3</dev/tty
+  else
+    warn "No terminal to read keypresses from, so every beat would run at once."
+    warn "Run it from a terminal, or use --auto to drive the whole thing."
+    exit 1
+  fi
+fi
+
 if [ ! -d "$PROJECT_DIR/.git" ]; then
   warn "No git repo at $PROJECT_DIR. Set DEMO_PROJECT in scripts/demo.env."
   exit 1
@@ -300,10 +323,14 @@ else
   # the table that explains them, and the tail is already running when you
   # start talking.
   beat_harness
-  cue "ON THE PHONE" "Pick $DEMO_PROJECT, hold the mic, and ask:"
-  printf '\n%s' "$Y"
-  printf '%s' "$DEMO_PROMPT" | fold -s -w 68 | sed 's/^/     /'
-  printf '%s\n' "$R"
+  cue "ON THE PHONE" "Pick $DEMO_PROJECT, hold the mic, and ask one of these:"
+  echo
+  printf '%s' "$DEMO_ASKS" | while IFS= read -r ask; do
+    [ -n "$ask" ] && printf '%s     - %s%s\n' "$Y" "$ask" "$R"
+  done
+  echo
+  printf '%s     - ask for the short version out loud%s\n' "$D" "$R"
+  printf '%s     - ask it to save the detail as a note%s\n' "$D" "$R"
   start_tail
   advance "press when the phone has finished speaking"
 fi
