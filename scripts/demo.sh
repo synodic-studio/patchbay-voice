@@ -18,8 +18,7 @@
 # Before demoing on a machine for the first time:
 #   1. The server is running and DEMO_PROJECT is checked out under ~/Developer.
 #   2. In the app: pick that project, set the model, turn on auto-commit and
-#      auto-push. The branch is whatever the app sends unless the server runs
-#      with VOICE_FORCE_COMMIT_BRANCH=<DEMO_BRANCH>, which is the easier way.
+#      auto-push. DEMO_BRANCH matches the app's default, so leave it alone.
 #   3. Run it once with --auto, then --cleanup, so the first live run is not
 #      the first run.
 #
@@ -35,7 +34,7 @@ CLEANUP=""
 
 DEMO_PROJECT="${DEMO_PROJECT:-patchbay-go}"
 DEMO_REPO="${DEMO_REPO:-synodic-studio/patchbay-go}"
-DEMO_BRANCH="${DEMO_BRANCH:-patchbay-demo}"
+DEMO_BRANCH="${DEMO_BRANCH:-patchbay}"
 DEMO_MODEL="${DEMO_MODEL:-dsf}"
 DEMO_SAVE_PATH="${DEMO_SAVE_PATH:-docs/patchbay/}"
 DEMO_LOG="${DEMO_LOG:-$HOME/Library/Logs/patchbay-voice-server.log}"
@@ -233,26 +232,21 @@ if [ ! -d "$PROJECT_DIR/.git" ]; then
   exit 1
 fi
 
-VERSION_JSON=$(api GET "/api/version")
-VERSION=$(printf '%s' "$VERSION_JSON" | json "d['version']")
+VERSION=$(api GET "/api/version" | json "d['version']")
 if [ -z "$VERSION" ]; then
   warn "No server at $HOST. Start it, or pass --host."
   exit 1
 fi
 
-# A branch mismatch is invisible until the payoff slide, where it reads as the
-# demo failing. Catch it here instead: either the server pins the branch, or
-# the app's own branch field has to match.
-FORCED_BRANCH=$(printf '%s' "$VERSION_JSON" | json "d.get('forced_commit_branch','')")
-if [ "$FORCED_BRANCH" != "$DEMO_BRANCH" ]; then
-  warn "Server is not pinning the commit branch to $DEMO_BRANCH."
-  if [ -n "$FORCED_BRANCH" ]; then
-    warn "It pins '$FORCED_BRANCH'. Set DEMO_BRANCH to match, or repin the server."
-  else
-    warn "Either set the app's branch field to $DEMO_BRANCH, or restart the"
-    warn "server with VOICE_FORCE_COMMIT_BRANCH=$DEMO_BRANCH."
-  fi
-  echo
+# The payoff is a branch that did not exist a minute ago. If it is already
+# there, the demo cannot show that, and --cleanup would delete whatever is on
+# it. Refuse now rather than on the last slide.
+if git -C "$PROJECT_DIR" rev-parse --verify "refs/heads/$DEMO_BRANCH" >/dev/null 2>&1 \
+   || git -C "$PROJECT_DIR" ls-remote --exit-code --heads origin "$DEMO_BRANCH" >/dev/null 2>&1; then
+  warn "$DEMO_PROJECT already has a $DEMO_BRANCH branch."
+  warn "If it is left over from a previous run, clear it with --cleanup."
+  warn "If it holds real notes, point DEMO_BRANCH somewhere else instead."
+  exit 1
 fi
 
 CHAT_ID=$(resolve_chat)
