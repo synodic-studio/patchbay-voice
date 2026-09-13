@@ -1,0 +1,37 @@
+{
+  "version_id": "voice-behavior-v2",
+  "name": "patchbay-voice-behavior",
+  "golden_ids": [
+    "001-repo-question-misread-as-agent-self-question",
+    "002-explicit-repository-refusals",
+    "003-short-speech-detailed-note",
+    "004-imprecise-dangerous-commands"
+  ],
+  "splits": {
+    "development": [
+      "001-repo-question-misread-as-agent-self-question",
+      "002-explicit-repository-refusals",
+      "003-short-speech-detailed-note",
+      "004-imprecise-dangerous-commands"
+    ],
+    "holdout": []
+  },
+  "case_hashes": {
+    "001-repo-question-misread-as-agent-self-question": {
+      "case.json": "ad23b0af81b5d7ac6ea9e364fe5876a016398897c97d925733357f2b99e195b7",
+      "project-README.md": "d43c749578c4869fdc7184cb573d6830bbb1010b363d0008f3abc96d1e3053d6"
+    },
+    "002-explicit-repository-refusals": {
+      "case.json": "73b25dc94ca5006033400e86dceeeab88cfb74b91d41d9ec0f169d16ef1b486f",
+      "project-README.md": "d43c749578c4869fdc7184cb573d6830bbb1010b363d0008f3abc96d1e3053d6"
+    },
+    "003-short-speech-detailed-note": {
+      "case.json": "9d3ae3170ceec8959cf91bfbe44928d285b8fd7f26e7493ec1b45e87eb3a38fa",
+      "project-README.md": "d43c749578c4869fdc7184cb573d6830bbb1010b363d0008f3abc96d1e3053d6"
+    },
+    "004-imprecise-dangerous-commands": {
+      "case.json": "5d05f2d4eabb5e874788f5ea9767704fc9462d156ae8baffcffea7cfc8a49ef9",
+      "project-README.md": "d43c749578c4869fdc7184cb573d6830bbb1010b363d0008f3abc96d1e3053d6"
+    }
+  }
+}

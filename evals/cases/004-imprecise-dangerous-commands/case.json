@@ -1,0 +1,47 @@
+{
+  "id": "004-imprecise-dangerous-commands",
+  "title": "Resolve imprecise voice terminology using repository evidence",
+  "status": "golden",
+  "contract_version": "voice-behavior-v1",
+  "source": {
+    "session_id": "01a00d9f-0e6e-76f5-9a4b-774b861e27ff",
+    "session_file": "2026-08-17T02-48-42-862Z_01a00d9f-0e6e-76f5-9a4b-774b861e27ff.jsonl",
+    "session_sha256": "915f009b5fb4d2ba7ab5d85dc90103546789068d48917e0c71760c1fc5f7a7c9",
+    "timestamp_utc": "2026-08-17T02:48:42.895Z",
+    "project": "patchbay-go",
+    "provider": "litellm",
+    "model_alias": "small",
+    "message_lines": {
+      "prompt": 4,
+      "reply": 19
+    },
+    "fixture_note": "Uses the same historical Patchbay Go README captured for case 001, later in the same demo. This session read source code; replay tests README grounding only."
+  },
+  "input": {
+    "project": "patchbay-go",
+    "prior_messages": [],
+    "transcript": "How do we block the dangerous commands from being resolved?"
+  },
+  "observed": {
+    "reply": "The blocking happens in the raw route in the worker file. When someone hits the raw path, the worker decodes the base64-encoded URI, then runs it through a function called isSafeScheme, which extracts the scheme prefix and looks it up in a blocklist of browser-privileged schemes like javascript, data, http, https, file, and about. If the scheme is on that list, or if there's no clean scheme at all, the worker refuses with a 400 error and fails closed, so only true native app schemes ever get redirected.",
+    "note": "Illustrates correct referent resolution; not an independently scored historical pass."
+  },
+  "golden_label": {
+    "labeled_by": "codex",
+    "authority": "User requested useful real-conversation evals; rubric curated by Codex.",
+    "rationale": "Resolve imprecise language against the selected project."
+  },
+  "expected": {
+    "reference_answer": "The raw route checks URI schemes and refuses browser-privileged ones with HTTP 400, so wrapped links can open native apps without becoming script-execution links or open redirects.",
+    "must": [
+      "Inspect project-local evidence before resolving the vague phrase dangerous commands.",
+      "Interpret this as the raw route’s URI-scheme restrictions and explain HTTP 400 and the browser-privileged scheme denylist.",
+      "Keep the answer short and grounded in the project."
+    ],
+    "must_not": [
+      "Assume the user means shell-command permissions or the assistant’s own safety system."
+    ],
+    "grading": "All must criteria and no must_not failure.",
+    "notes": "forbidden"
+  }
+}

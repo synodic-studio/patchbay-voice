@@ -11,6 +11,7 @@ dependencies = [
     "google-auth>=2.40.0",
     "requests>=2.32.0",
     "segno>=1.6.0",
+    "pydantic>=2.13.4,<3",
 ]
 
 [dependency-groups]

@@ -1,0 +1,62 @@
+{
+  "observation_id": "019f1083-1a16-754f-9450-f445841a46e5:38",
+  "status": "candidate",
+  "source": {
+    "session_file": "2026-06-28T23-14-15-190Z_019f1083-1a16-754f-9450-f445841a46e5.jsonl",
+    "project": "patchbay-relay",
+    "session_sha256": "fa8b6d7eb6538117e8aa13b5814e822b9344863f3a3f95a8d3333d19dddc2188"
+  },
+  "messages": [
+    {
+      "line": 38,
+      "timestamp": "2026-06-28T23:21:20.965Z",
+      "role": "user",
+      "text": "Tell me the top level directories or top level ideas and then I will pick one for us to dig into"
+    },
+    {
+      "line": 39,
+      "timestamp": "2026-06-28T23:21:29.297Z",
+      "role": "assistant",
+      "text": "Sure. Here are the top-level directories and the main conceptual pieces.\n\nFirst, the top-level directories:\n\nbridge.py — This is the main entrypoint, about 2000 lines. It ties everything together: the Telegram handlers, the orchestration loop, the harness dispatch logic, the command handlers, and the startup and shutdown lifecycle.\n\npatchbay/ — This is the package directory with all the core modules. Inside it you have config.py for all environment variables and paths, sessions.py for session persistence, activity.py for structured logging, projects.py for chat-to-project mapping, self_heal.py for automatic failure recovery, text_split.py for Telegram-safe chunking, file_send.py for attachments, outbound.py for recent notifications, and so on. Then there's the harness/ subdirectory with the pluggable agent backends, and the commands/ subdirectory with the slash command implementations.\n\ntests/ — About 800 tests. Conftest has an autouse fixture that isolates every production filesystem path into a temporary directory so tests never touch real data.\n\nsessions/ — The on-disk storage for Claude resume session IDs.\n\npending/ — Saved incoming messages that haven't been processed yet, so nothing is lost if the bridge crashes mid-turn.\n\noutbound/ — Logged notifications that were sent to each Telegram thread, so the model can reference them.\n\nlogs/ — Standard log files.\n\nstargate/ — The old name for this project before it was renamed to Patchbay.\n\nscripts/ — Standalone utilities, including the soak comparison script for comparing harness performance.\n\ndocs/ — Design documents, including the harness design doc that explains why the protocol is shaped the way it is.\n\nThen the conceptual pieces that span across files:\n\nThe harness protocol is the abstraction layer between the bridge and the coding agent. Each harness implements a run_turn method that yields a stream of typed events, and advertises its capabilities upfront so the bridge can decide what features are available.\n\nThe orchestration loop claims a processing lane for a session, runs the harness in a thread pool executor since it's sync, sends the response, drains any queued follow-up messages, and then releases the lane.\n\nThe session model maps each Telegram topic to a Claude session, with disk persistence, expiry, and inflight push support for harnesses that can handle it.\n\nThe failure model uses the self-heal dispatcher so every failure path attempts automatic repair before ever alerting you, and everything is logged to activity.jsonl for audit.\n\nAnything catch your eye that you want me to walk into?"
+    },
+    {
+      "line": 40,
+      "timestamp": "2026-06-28T23:24:35.350Z",
+      "role": "user",
+      "text": "That was interesting, but it was so long I couldn't keep track of the items. Just give them to me rapid fire"
+    },
+    {
+      "line": 41,
+      "timestamp": "2026-06-28T23:24:37.597Z",
+      "role": "assistant",
+      "text": "Sure. Directory-wise: bridge.py, patchbay/, tests/, sessions/, pending/, outbound/, logs/, stargate/, scripts/, docs/.\n\nConceptually: harness protocol, orchestration loop, session model, failure model."
+    },
+    {
+      "line": 42,
+      "timestamp": "2026-06-28T23:25:20.759Z",
+      "role": "user",
+      "text": "First, tell me why Stargate Directory even exists because we renamed the whole thing. I didn't think we'd see anything by that name anymore, and then after that I think I'm most interested in talking about the harness protocol."
+    },
+    {
+      "line": 45,
+      "timestamp": "2026-06-28T23:25:25.242Z",
+      "role": "assistant",
+      "text": "It is an empty directory. A ghost. The rename from Stargate to Patchbay happened, but the empty stargate folder was never cleaned up. It has no code, no config, nothing functional left inside it."
+    },
+    {
+      "line": 46,
+      "timestamp": "2026-06-28T23:26:04.713Z",
+      "role": "user",
+      "text": "Okay, make a note to delete that directory and then now tell me about the harness protocol."
+    },
+    {
+      "line": 53,
+      "timestamp": "2026-06-28T23:26:17.934Z",
+      "role": "assistant",
+      "text": "Done. Now for the harness protocol.\n\nThe harness protocol is the abstraction layer that lets Patchbay run multiple different coding agents behind one interface. The core idea is a strict contract: each harness implements a run_turn method that accepts a TurnRequest and yields a stream of TurnEvent objects, and that stream always ends with exactly one TurnFinal or TurnError. Everything else is optional.\n\nThe TurnRequest carries everything the agent needs to do one round of work: the user's prompt, the project directory, a resume session ID if one exists, the model name, the effort level, any tool allow or deny lists, the max turns budget, and a plugin directory for MCP servers. Fields the harness doesn't support just get silently ignored.\n\nThe events that can come back during a turn are TextDelta for incremental text output, ToolUse for tool call requests, ToolResult for tool call responses, and then the two terminal events. TurnFinal wraps the full response text, the new session ID for resumption, the turn count, and the cost. TurnError wraps a classified failure kind like rate limit, OOM, corrupt session, max turns, timeout, process died, or unknown, plus a human-readable message and a retryable flag.\n\nEach harness also advertises its capabilities upfront through a HarnessCapabilities object. Things like whether it supports resuming sessions, streaming tool calls mid-turn, inflight push for receiving new user messages during a running turn, querying context window usage, compacting context, loading MCP servers, or varying effort levels. The bridge reads these flags at dispatch time to decide what features are available.\n\nThere are currently three harnesses implementing this protocol. The Claude SDK harness, which is the default and the most capable. The Claude SDK MOP variant, which adds a Model Output Protocol filtering layer that sends Telegram messages directly from inside the agent. And the Pi harness, which wraps the badlogicgames multi-model agent as a subprocess. A Claude CLI subprocess harness existed before but was retired after a live comparison showed the SDK was about 35 percent faster median latency with the same capabilities.\n\nThe protocol was designed to be small on purpose. It only captures what the bridge actually needs from the agent today, without baking in CLI-specific or SDK-specific shapes. That way, if someone wants to add a future backend like Codex or Cursor, they just implement the protocol and the bridge doesn't need to change."
+    }
+  ],
+  "rationale": "User cannot retain a long spoken list and asks for rapid-fire options; agent briefly adapts, then becomes verbose again. Also distinguishes taking a deletion note from deleting the directory.",
+  "promotion_requirements": "Needs multi-turn replay and historical repo fixture; evaluate persistence of the brevity correction and note-only behavior.",
+  "label_source": "codex review at user request"
+}

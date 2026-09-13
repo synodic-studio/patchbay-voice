@@ -1,0 +1,56 @@
+{
+  "id": "001-repo-question-misread-as-agent-self-question",
+  "title": "Answer raw-route questions about the selected repository",
+  "status": "golden",
+  "source": {
+    "session_id": "01a00db2-ca93-775a-893a-b84923271d95",
+    "session_file": "2026-08-17T03-10-16-211Z_01a00db2-ca93-775a-893a-b84923271d95.jsonl",
+    "session_sha256": "df1c3b6ff74b4513f36177e5d477c35e516344bc636710d6d3821f0f7668ee37",
+    "timestamp_utc": "2026-08-17T03:10:16.308Z",
+    "project": "patchbay-go",
+    "provider": "litellm",
+    "model_alias": "small",
+    "thinking_level": "high",
+    "message_lines": {
+      "prompt": 4,
+      "failed_reply": 11,
+      "user_correction": 12,
+      "recovery_reply": 19
+    }
+  },
+  "input": {
+    "project": "patchbay-go",
+    "prior_messages": [],
+    "transcript": "How are raw route refuses, refusals done, and how is the redirect handled in your response? Make sure to keep it short. I'm just doing a demo here."
+  },
+  "observed_failure": {
+    "reply": "I can't actually open the pi documentation from this directory, since it lives outside the project and my file tools are blocked from reading there. Based on how this works in practice though: a refusal just comes back to me as normal text content in the model's reply, so I treat it as a message rather than a special event, and redirects are handled by the agent layer routing, not in my response text. Since this is just a demo, want me to keep the answer that short, or dig into the actual docs another way?",
+    "tool_behavior": "Four grep_search attempts against pi installation documentation outside the selected project; rejected by project path boundaries. No project read before the failed reply."
+  },
+  "followup_evidence": {
+    "user_correction_verbatim": "I meant for you to actually de-afternap out his repo.",
+    "recovery_reply": "Got it — you wanted me to actually read the repo, not the pi docs. So here's the real answer from the source. The raw route refuses twelve browser-privileged schemes and answers with a 400. Eight of them — javascript, vbscript, data, blob, file, filesystem, about, and view-source — could execute script or read local files in the browser. The other four — http, https, ws, and wss — are refused so the raw route can't be turned into an open redirect by someone else's phishing link. The scheme check is case-insensitive against everything before the first colon, and everything after the scheme is escaped rather than trusted. As for the redirect itself, it's just a page showing a spinner over \"Opening today.md in Obsidian\" with a manual tap-through link below; it flashes by when the app opens and only lingers if the app isn't installed, since there's no error to catch in that case.",
+    "note": "Correction has apparent ASR corruption; preserved verbatim. Recovery is evidence of intended referent, not a perfect gold answer. Do not include either follow-up in the initial evaluation input."
+  },
+  "expected": {
+    "reference_answer": "In Patchbay Go, /raw checks the decoded URI scheme and returns HTTP 400 for browser-privileged schemes, including http and https, to prevent script execution and open redirects. Valid links get an HTML page that hands off to the native app, with a manual fallback link if the handoff does not open it.",
+    "must": [
+      "Ground the answer in the selected Patchbay Go repository, using project-local evidence.",
+      "Explain /raw URI-scheme rejection and HTTP 400, including the open-redirect rationale.",
+      "Explain the browser-to-native-app redirect page and fallback.",
+      "Keep the spoken answer concise."
+    ],
+    "must_not": [
+      "Substitute model safety refusals, pi internals, or the assistant’s own routing for repository behavior.",
+      "Treat blocked access to pi installation docs as a reason to guess about the agent."
+    ],
+    "grading": "Pass only if all must criteria hold and no must_not failure occurs. Judge meaning and tool evidence, not exact wording; a request for clarification alone does not pass this case.",
+    "notes": "forbidden"
+  },
+  "contract_version": "voice-behavior-v1",
+  "golden_label": {
+    "labeled_by": "codex",
+    "authority": "Adrien explicitly selected this failure as the first eval.",
+    "rationale": "Keep the selected repository as the referent of ambiguous technical questions."
+  }
+}

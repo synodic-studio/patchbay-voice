@@ -1,0 +1,48 @@
+{
+  "id": "002-explicit-repository-refusals",
+  "title": "Explicit repository wording as a control",
+  "status": "golden",
+  "contract_version": "voice-behavior-v1",
+  "source": {
+    "session_id": "01a00db4-7ebf-71e1-bde5-00b453d99d70",
+    "session_file": "2026-08-17T03-12-07-871Z_01a00db4-7ebf-71e1-bde5-00b453d99d70.jsonl",
+    "session_sha256": "195181e11b00ab746dc8c45a6ef108a691c4f747ba2dc453dd6cba9318f92347",
+    "timestamp_utc": "2026-08-17T03:12:07.895Z",
+    "project": "patchbay-go",
+    "provider": "litellm",
+    "model_alias": "small",
+    "message_lines": {
+      "prompt": 4,
+      "reply": 11
+    },
+    "fixture_note": "Uses the historical README from case 001 in the same demo. This session searched source and README together; combined grep output is not a README fixture."
+  },
+  "input": {
+    "project": "patchbay-go",
+    "prior_messages": [],
+    "transcript": "How are raw route refusals done in this repo? Make sure to keep the answer short, since this is a demo."
+  },
+  "observed": {
+    "reply": "In the worker file, the raw route decodes the base64-encoded URI, then passes it through a function called isSafeScheme. That function pulls out the scheme before the first colon, and refuses it if it's not there or if it's on a blocklist of twelve browser-privileged schemes — things like javascript, data, http, https, and ws. If it fails, the request gets a 400 with a refused message. It fails closed, meaning anything without a clean custom scheme is rejected.",
+    "written_note_arguments": {},
+    "note": "Historical illustration, not assumed to satisfy every current rubric criterion."
+  },
+  "golden_label": {
+    "labeled_by": "codex",
+    "authority": "User requested useful real-conversation evals; rubric curated by Codex.",
+    "rationale": "Explicit repository wording as a control"
+  },
+  "expected": {
+    "reference_answer": "The raw route checks the decoded URI scheme and rejects browser-privileged schemes with HTTP 400, preventing script execution and open redirects.",
+    "must": [
+      "Read project-local evidence and answer about Patchbay Go’s raw route.",
+      "Explain that the URI scheme is checked and browser-privileged schemes are refused with HTTP 400 to prevent browser execution or open redirects.",
+      "Keep the spoken reply brief."
+    ],
+    "must_not": [
+      "Explain model refusals or pi internal routing instead of the selected repository."
+    ],
+    "grading": "All must criteria and no must_not failure; inspect both tool trace and artifacts.",
+    "notes": "forbidden"
+  }
+}

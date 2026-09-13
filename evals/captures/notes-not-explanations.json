@@ -1,0 +1,38 @@
+{
+  "observation_id": "019f18c0-6abe-78bc-a7e3-1968548d53f2:46",
+  "status": "candidate",
+  "source": {
+    "session_file": "2026-06-30T13-38-11-262Z_019f18c0-6abe-78bc-a7e3-1968548d53f2.jsonl",
+    "project": "patchbay-voice",
+    "session_sha256": "c8f0b1ee62c2582339d707b80be96e1b729c369e86682fb196f08d99d4b69ff9"
+  },
+  "messages": [
+    {
+      "line": 46,
+      "timestamp": "2026-06-30T13:47:13.141Z",
+      "role": "user",
+      "text": "In the directory that we create for the patch bay voice sessions, let's add an agent's markdown file that very briefly describes where the files came from so that if a coding agent later gets pointed toward it with limited or no context, it knows what that directory means. And that should be able to be to toggled on or off in settings and perhaps also customizable in settings. I'm also curious where the conversation, I guess I don't know if there are logs or just the conversation settings, if those get persisted in the app or are those living inside of a file on the server. I'm not sure which is best, I'm just curious which one we have right now. And then along with that agent's markdown file option, maybe include a toggle that would also create a clod markdown file that doesn't do anything more than just import the agent's markdown. Or maybe it's just a sim link, either or both of those options probably."
+    },
+    {
+      "line": 54,
+      "timestamp": "2026-06-30T13:47:46.547Z",
+      "role": "assistant",
+      "text": "All set. I added three new sections and answered your question about conversation storage.\n\nFor the AGENTS.md file, that's now section ten. It describes a toggle in settings that, when enabled, automatically creates an AGENTS.md file in the save directory explaining where the files came from. The content is customizable in settings so you can write your own description for future agents.\n\nSection eleven covers the CLAUDE.md option alongside it. You'd get toggles for both, plus a choice between making CLAUDE.md a symlink to AGENTS.md or just importing it. Both options keep things in sync with minimal maintenance.\n\nAnd section twelve answers your question about conversation storage. Right now, conversations live entirely on the server. The app fetches chat lists and individual turn responses via API calls, but stores nothing locally. TalkViewModel holds the current transcript and reply in memory only, so it goes away when the app closes. If you want local history or offline access, that would need to be added as a future feature."
+    },
+    {
+      "line": 55,
+      "timestamp": "2026-06-30T13:54:00.477Z",
+      "role": "user",
+      "text": "If you're writing stuff just for my benefit of understanding then you don't need to write it to any document the document you're saving to it's just notes for changes to be done in my next coding agent session. Now another feature I thought of is that when the app is first installed it doesn't yet have microphone permission so instead of having a record button it should be something like enable microphone or something of that effect. Basically so a user understands that it's not going to start recording the very instant they press that button the first time it's going to take one more click one more step. And then yet another feature that I was thinking of is that oh yeah if the agent is already working on something from a message that I sent through this app through patchbay voice then there should be an option to send a message in the meantime that just gets queued up and then I think when that message gets delivered next it should be prefixed with something that says like queued while you were working or queued during the previous response. But also actually I think that our agent that we plug into is steerable or can accept queued messages so we might not actually have a lot of work or maybe no work to do because it might natively understand that we kind of inserted it while it was working. Oh and then another feature too is that we currently don't let the agent do any committing but I actually think it could be very valuable for it to be able to commit content in the patchbay directory to a branch that is patchbay slash whatever the work is and maybe we make some changes that make that strict but anyway what that lets me do or lets a user do is that they can then they can actually have patchbay voice commit work to an isolated branch and then do something like clogged code in the cloud and pointed at that branch and get that work done all with very little contact."
+    },
+    {
+      "line": 62,
+      "timestamp": "2026-06-30T13:54:36.059Z",
+      "role": "assistant",
+      "text": "Got it. I added three new sections to the notes.\n\nSection thirteen covers the microphone permission UX. On first launch before permission is granted, the record button should say something like Enable Microphone instead of being a standard record button. One tap prompts for permission, then the button changes to the normal record state.\n\nSection fourteen covers queued messages while the agent is working. If you send a message while a previous one is still being processed, it gets queued and later delivered with a prefix like Queued while you were working. I also noted that the underlying agent might handle this natively, so it may need little or no client-side work.\n\nSection fifteen covers auto-committing to isolated branches. The agent would commit changes in the patchbay directory to a branch like patchbay slash work-description. That way you can have Patchbay Voice push work to an isolated branch, then point a cloud coding tool at that branch to finish things up. The save path rules may need to be stricter for this to work reliably."
+    }
+  ],
+  "rationale": "User distinguishes durable coding-session notes from explanations meant only for the current conversation.",
+  "promotion_requirements": "Needs previous notes and conversation context; original reply is illustrative, not a gold answer.",
+  "label_source": "codex review at user request"
+}

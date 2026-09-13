@@ -1,0 +1,51 @@
+{
+  "id": "003-short-speech-detailed-note",
+  "title": "Separate concise speech from a durable contributor note",
+  "status": "golden",
+  "contract_version": "voice-behavior-v1",
+  "source": {
+    "session_id": "01a00d6f-3260-7169-a6aa-7e03d3f8e452",
+    "session_file": "2026-08-17T01-56-26-337Z_01a00d6f-3260-7169-a6aa-7e03d3f8e452.jsonl",
+    "session_sha256": "129d31b521a988f08c757b9e8c3d231bec79cf5a79ee9e83b683893cd6ceb8e7",
+    "timestamp_utc": "2026-08-17T01:56:26.395Z",
+    "project": "patchbay-go",
+    "provider": "litellm",
+    "model_alias": "small",
+    "message_lines": {
+      "prompt": 4,
+      "reply": 15
+    }
+  },
+  "input": {
+    "project": "patchbay-go",
+    "prior_messages": [],
+    "transcript": "Walk me through what happens when someone taps a Patchbay Go link, from the redirect through to the app opening. Keep the spoken version short and save the full walkthrough as a note for a new contributor."
+  },
+  "observed": {
+    "reply": "Sure. When you tap a Patchbay Go link, the chat app opens a tiny redirect page served by the Cloudflare worker, which builds the native app URI from the route. The page then hands off to that URI through a meta refresh and JavaScript, and the operating system launches the app. I saved the full walkthrough for new contributors in the docs folder.",
+    "written_note_arguments": {
+      "docs/patchbay/link-flow-walkthrough.md": "# What happens when someone taps a Patchbay Go link\n\nA new-contributor walkthrough of the full path a wrapped link takes, from the\nchat message to the native app opening. The whole flow is stateless: every step\nbelow is a pure function of the URL, handled by one Cloudflare Pages worker in\n`src/worker.js`.\n\n## 1. The link that gets sent\n\nChat apps like Telegram only linkify plain `https://` URLs, so the link someone\nreceives is an https address, never the raw custom scheme. Example:\n\n    https://go.synodic.co/things/Buy%20milk\n\nThe path tail is percent-encoded by whoever built the link. The two exception\nfamilies are the bare launcher routes (`/music`, `/slack`, ...) which carry no\nvalue, and `/raw/<base64url>` which carries an entire URI, encoded.\n\n## 2. The request hits the worker\n\nTapping opens the link in the device's browser. That request lands on the\nCloudflare Pages worker (`src/worker.js`), whose `fetch` handler in the default\nexport is the single entry point. It reads the path and dispatches:\n\n- `/` serves the marketing page (`dist/index.html` via the `ASSETS` binding,\n  falling back to an inline usage page).\n- `/key/...` goes to the E2E secret-handoff branch (KV-backed, separate flow,\n  not covered in detail here).\n- Everything else is a wrapped-link route.\n\n## 3. The worker builds the native URI\n\nEach named route is an entry in `APP_ROUTES`, which maps a short path segment\nto a fixed custom-scheme prefix. The handler appends the URI-encoded path tail\nto that prefix. `/things/Buy%20milk` becomes:\n\n    things:///add?title=Buy%20milk\n\nThe same pattern holds for the three hardcoded routes:\n\n- `/obsidian/<vault>/<path>` builds `obsidian://open?vault=...&file=...`\n  (`/obs/` is an unadvertised shorthand for the same).\n- `/remind/<title>` builds `x-apple-reminderkit://REMCDReminder/<title>`.\n- `/cal/<date>[/<time>]` converts the date to Cocoa/CFAbsoluteTime (seconds\n  since 2001-01-01, offset 978307200) and emits `calshow:<epoch>`. Note the\n  comment in the source: using the Unix epoch here opens Calendar decades late,\n  which was caught on-device.\n\nRoutes are safe by construction (fixed prefix plus an encoded tail), so they\nskip the scheme check that `/raw` needs.\n\n## 4. The `/raw` safety check\n\n`/raw` takes a URI from whoever built the link, so before emitting anything the\nworker base64url-decodes it and runs `isSafeScheme`. That requires a clean\n`scheme:` prefix and refuses browser-privileged schemes (`javascript:`, `data:`,\n`http:`, `https:`, `ws:`, and friends). This is what stops `/raw` from becoming\nan open redirect or an XSS vector. Anything that fails gets a 400.\n\n## 5. The redirect page is served\n\nFor any wrapped route the worker returns `redirectPage(appUri, message)`, a\ntiny self-contained HTML page. It shows a spinner, a friendly line like\n\"Opening Things\", a manual \"tap here if nothing happened\" link, and then fires\ntwo redundant handoffs to the custom scheme:\n\n1. A meta refresh in the head: `http-equiv=\"refresh\" content=\"0;url=<appUri>\"`.\n2. An inline script: `window.location.href = <appUri>`.\n\nThe redundancy matters because some browsers ignore one mechanism or the other.\nAll interpolated values go through `escapeHtml` / `escapeAttr` /\n`jsStringLiteral`, so nothing from the URL can break out of the page (the\n`jsStringLiteral` helper in particular neutralizes `</script>` and Unicode line\nseparators).\n\n## 6. The browser hands off to the OS\n\nThe browser navigates to the custom scheme URI. Browsers do not understand\nschemes like `things://` or `calshow:`, so they pass the URI to the operating\nsystem, which looks up which installed app registered that scheme and launches\nit with the URI as the payload. That is why the handoff works in the browser\nbut not in the chat app: chat apps only linkify https, while browsers are the\none hop where custom schemes are allowed.\n\n## 7. If the app is missing\n\nIf no app is registered for the scheme, the OS shows an error or silently does\nnothing and the redirect page simply stays on screen. There is no error the\nworker could catch here — this is platform behavior, not the worker's. The\nworker's fallback text on the page says so: the link only works where the app\nis installed.\n\n## Where each piece lives\n\n- `src/worker.js` — the entire relay: routes, URI building, `/raw` check,\n  redirect page, key handoff.\n- `website/index.html` — the marketing/landing page (built into `dist/`).\n- `clients/patchbay_key.py` — the reference agent client for the `/key`\n  secret-handoff flow.\n- `wrangler.toml` / `DEPLOYING.md` — deployment, routes bound to a domain.\n"
+    },
+    "note": "Historical illustration, not assumed to satisfy every current rubric criterion."
+  },
+  "golden_label": {
+    "labeled_by": "codex",
+    "authority": "User requested useful real-conversation evals; rubric curated by Codex.",
+    "rationale": "Separate concise speech from a durable contributor note"
+  },
+  "expected": {
+    "reference_answer": "The spoken answer briefly explains the browser hop and app handoff and confirms the note location. The saved contributor note expands on the link flow and fallback behavior.",
+    "must": [
+      "Read project-local evidence to explain the HTTPS link, browser hop, native URI and operating-system app handoff.",
+      "Keep the spoken reply concise, without reciting the full contributor note.",
+      "Actually create a readable contributor note under docs/patchbay/; verify the captured artifact, not just a claim to have saved it.",
+      "The note explains the HTTPS wrapper, worker redirect, native app handoff, and fallback when the app is absent."
+    ],
+    "must_not": [
+      "Claim a note was saved when there is no corresponding artifact.",
+      "Modify project source or README instead of writing the requested note."
+    ],
+    "grading": "All must criteria and no must_not failure; inspect both tool trace and artifacts.",
+    "notes": "required"
+  }
+}

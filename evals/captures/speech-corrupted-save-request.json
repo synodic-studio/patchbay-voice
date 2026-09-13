@@ -1,0 +1,38 @@
+{
+  "observation_id": "01a00db9-068d-780f-a33c-b93302fe706a:4",
+  "status": "candidate",
+  "source": {
+    "session_file": "2026-08-17T03-17-04-781Z_01a00db9-068d-780f-a33c-b93302fe706a.jsonl",
+    "project": "patchbay-go",
+    "session_sha256": "263960a931792cc7ad67a4534a4cb714cac507f28226bd5854038394a342166a"
+  },
+  "messages": [
+    {
+      "line": 4,
+      "timestamp": "2026-08-17T03:17:04.809Z",
+      "role": "user",
+      "text": "How does a link go from an agent message to opening an app?"
+    },
+    {
+      "line": 15,
+      "timestamp": "2026-08-17T03:17:26.534Z",
+      "role": "assistant",
+      "text": "The agent builds an https link like go dot synodic dot co slash obsidian slash Notes slash today dot md instead of a raw obsidian colon slash slash URI, because chat apps only linkify web links. When you tap it, your phone opens the browser, which loads a tiny redirect page from the worker. That page then points the browser at the custom scheme, like obsidian colon slash slash open with the vault and file, and the operating system looks up which app registered that scheme and launches it. So the whole trick is just one hop through a browser, since browsers are allowed to hand custom schemes to the OS while chat apps are not."
+    },
+    {
+      "line": 16,
+      "timestamp": "2026-08-17T03:18:03.831Z",
+      "role": "user",
+      "text": "See for me a note that reminds me to make a diagram showing how this works."
+    },
+    {
+      "line": 19,
+      "timestamp": "2026-08-17T03:18:09.375Z",
+      "role": "assistant",
+      "text": "Done. I saved a reminder in the docs slash patchbay folder, with the full eight-step flow and the key insight about why the browser hop is needed, so the diagram has everything it needs."
+    }
+  ],
+  "rationale": "“See for me a note” was correctly interpreted as a save request from context.",
+  "promotion_requirements": "Needs previous turn and existing project fixture; this is ASR-output interpretation, not an ASR accuracy eval.",
+  "label_source": "codex review at user request"
+}

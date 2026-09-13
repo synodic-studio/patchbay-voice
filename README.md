@@ -233,3 +233,7 @@ the [ADRs](docs/adr/) and tested against them.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Behavioral evaluations
+
+Real voice conversations are retained as golden cases and candidate captures in [evals/](evals/README.md). Run `./scripts/eval.sh --all --calibrate` for a live experiment through the production agent path, using LiteLLM `small` for both candidate and grader. The normal `./scripts/test.sh` gate stays offline. [Conversation review](evals/review.md) explains the selected cases and remaining candidates.

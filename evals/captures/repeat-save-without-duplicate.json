@@ -1,0 +1,38 @@
+{
+  "observation_id": "01a00d99-dcf8-7b90-a93e-bd89d32b2225:4",
+  "status": "candidate",
+  "source": {
+    "session_file": "2026-08-17T02-43-02-521Z_01a00d99-dcf8-7b90-a93e-bd89d32b2225.jsonl",
+    "project": "patchbay-go",
+    "session_sha256": "2c2b0846617e1d52ff652f23f6f9e6886aa950ee83945294d343e3821a1fd5e6"
+  },
+  "messages": [
+    {
+      "line": 4,
+      "timestamp": "2026-08-17T02:43:02.725Z",
+      "role": "user",
+      "text": "Walk me through what happens when someone taps a Patchbay Go link, from the redirect through to the app opening, and save that as a note for a new contributor."
+    },
+    {
+      "line": 17,
+      "timestamp": "2026-08-17T02:43:39.064Z",
+      "role": "assistant",
+      "text": "The note is saved at docs slash patchbay slash LINK-TAP-FLOW dot md. Here's the walkthrough. Chat apps only make https links tappable, so a raw obsidian link arrives as dead text. Instead, the sender pastes an https address like go dot synodic dot co slash obsidian slash vault slash file. When someone taps it, the chat app opens the system browser. The browser hits the Cloudflare Pages worker, which is a single function in src slash worker dot js. The worker reads the path, matches it against its route table, and builds the real app URI, like obsidian colon slash slash open with the vault and file, or a calendar scheme using Apple's special Cocoa time. It then returns a tiny HTML page with a meta refresh and a JavaScript redirect, both pointing at that URI, plus a spinner and a manual fallback link. Since the page came from https, the browser is allowed to hand the custom scheme to the operating system, which launches the app with the deep link, and the note opens. If the app isn't installed, the page just sits there spinning, because the platform gives no error to catch. The one safety detail worth remembering is that the raw route blocks browser-privileged schemes including http and https, which keeps the whole thing from being an open redirect."
+    },
+    {
+      "line": 18,
+      "timestamp": "2026-08-17T02:43:42.483Z",
+      "role": "user",
+      "text": "Walk me through what happens when someone taps a Patchbay Go link, from the redirect through to the app opening, and save that as a note for a new contributor."
+    },
+    {
+      "line": 21,
+      "timestamp": "2026-08-17T02:43:49.431Z",
+      "role": "assistant",
+      "text": "That note is already saved — I created it a moment ago at docs slash patchbay slash LINK-TAP-FLOW dot md, and I just confirmed it's intact. Here's the walkthrough again. Someone taps the https link in a chat, and the chat app opens the system browser. The browser requests the URL, and the Cloudflare Pages worker in src slash worker dot js matches the path against its routes, building the real app URI, like an obsidian colon slash slash open call, or a calendar scheme in Apple's Cocoa time. It returns a small HTML page that redirects two ways, with a meta refresh and a JavaScript navigation, both pointing at that URI, plus a spinner and a manual fallback link. Because the page came from https, the browser can hand the custom scheme to the operating system, which launches the registered app with the deep link. If the app isn't installed, the page just sits there with no error, since the platform gives nothing to catch. The note covers all six steps including the raw route's scheme denylist and the deploy commands, so a new contributor can read the whole story from that one file."
+    }
+  ],
+  "rationale": "Repeated request reused and checked the saved note rather than creating another.",
+  "promotion_requirements": "Needs a seeded session plus the first note to evaluate idempotent behavior.",
+  "label_source": "codex review at user request"
+}

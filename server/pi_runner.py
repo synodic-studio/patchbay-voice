@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 import threading
+from collections.abc import Callable
+from pathlib import Path
 
 from fastapi import HTTPException
 
@@ -180,7 +182,10 @@ def _find_error(events: list[dict]) -> str | None:
     return None
 
 
-async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/", model: str = "") -> str:
+async def run_pi(
+    user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/", model: str = "",
+    on_event: Callable[[dict], None] | None = None, session_dir: Path | None = None,
+) -> str:
     # Fail fast if pi isn't installed — don't let None propagate to subprocess
     if PI_BIN is None:
         raise HTTPException(
@@ -220,6 +225,8 @@ async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/
 
         if chat.pi_session_id:
             cmd.extend(["--session", chat.pi_session_id])
+        if session_dir is not None:
+            cmd.extend(["--session-dir", str(session_dir)])
         cmd.extend(["--append-system-prompt", system_prompt])
         # Lock down: no built-in tools, no global extensions, no skills
         cmd.extend(["--no-builtin-tools"])
@@ -251,6 +258,9 @@ async def run_pi(user_text: str, chat: Chat, *, save_path: str = "docs/patchbay/
                     for line in proc.stdout:
                         chunks.append(line)
                         _echo_tool_call(line, chat.id)
+                        if on_event is not None:
+                            for event in _parse_events(line):
+                                on_event(event)
                 proc.wait()
             finally:
                 watchdog.cancel()

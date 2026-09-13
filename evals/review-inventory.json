@@ -1,0 +1,286 @@
+{
+  "reviewed_at": "2026-09-13",
+  "scope": "Retained local pi conversations identified as voice sessions or adjacent evidence, including one Voice development-session confusion case. Not a claim that deleted chats or every development log were recovered.",
+  "sessions": [
+    {
+      "session_id": "01a00d6e-3b1d-764d-ae32-fdc0f2c41c0c",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T01-55-23-037Z_01a00d6e-3b1d-764d-ae32-fdc0f2c41c0c.jsonl",
+      "sha256": "b40ecc2b715ef17a2bccc3511b6ec9860c09b05aa29a97da307afa4accd490de",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d99-dcf8-7b90-a93e-bd89d32b2225",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T02-43-02-521Z_01a00d99-dcf8-7b90-a93e-bd89d32b2225.jsonl",
+      "sha256": "2c2b0846617e1d52ff652f23f6f9e6886aa950ee83945294d343e3821a1fd5e6",
+      "user_turns": 2,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d9b-e1d1-733f-9a07-4dc4bdd19e03",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T02-45-14-835Z_01a00d9b-e1d1-733f-9a07-4dc4bdd19e03.jsonl",
+      "sha256": "30313ce62947592983ab9216e7a9ed26e9eeb2046464ed1d0286e7487f0b18c8",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00db9-068d-780f-a33c-b93302fe706a",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T03-17-04-781Z_01a00db9-068d-780f-a33c-b93302fe706a.jsonl",
+      "sha256": "263960a931792cc7ad67a4534a4cb714cac507f28226bd5854038394a342166a",
+      "user_turns": 2,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00da9-af2f-74d6-9367-f47a21c6dc13",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T03-00-19-375Z_01a00da9-af2f-74d6-9367-f47a21c6dc13.jsonl",
+      "sha256": "c301e19c5ceccf7757fd35e80a635aaa8eb941cc2023f18c66c0fa63d48b8400",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00da8-baf8-7630-ab09-2001e505893d",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T02-59-16-857Z_01a00da8-baf8-7630-ab09-2001e505893d.jsonl",
+      "sha256": "4f0dbc414791aaa7bff001b3b2860f989f54fdb873f03b471f722289f49aad0a",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d65-0d27-762b-b657-73cf1502b213",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T01-45-21-448Z_01a00d65-0d27-762b-b657-73cf1502b213.jsonl",
+      "sha256": "c099bf366bbf5009fdfd303d87a4b3aecbd95ba46cf9b2395fa3ce64eb8a11fe",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d9d-64ab-7413-ae10-2f3fd4d665cf",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T02-46-53-872Z_01a00d9d-64ab-7413-ae10-2f3fd4d665cf.jsonl",
+      "sha256": "35b9c2f1a4e92696e5e2ed0ce6f20c52cd5609c400954fc3eddab5e1a49cfe4b",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d61-257b-79c4-b4e1-a6b203901d4e",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T01-41-05-535Z_01a00d61-257b-79c4-b4e1-a6b203901d4e.jsonl",
+      "sha256": "51e8478d74e8a40d87bfde3ddddd3943daefa753874b40b1ccb05dc2e2d23c86",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d6b-a8a0-75e5-99c1-6c5a32858ff7",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T01-52-34-464Z_01a00d6b-a8a0-75e5-99c1-6c5a32858ff7.jsonl",
+      "sha256": "7985a67dd9160b1b12c2f101872485fccb94ed7e3c9f1deff47d322a1bdb3d3f",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d67-59a4-781f-b35f-7e3b82b23e02",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T01-47-52-100Z_01a00d67-59a4-781f-b35f-7e3b82b23e02.jsonl",
+      "sha256": "faa6299aad601c1147262433fbc01eab7d62b60efae4c15c8e572ee68b0b7431",
+      "user_turns": 2,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00daf-79d5-7557-88d0-13e3a1e5bffe",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T03-06-38-933Z_01a00daf-79d5-7557-88d0-13e3a1e5bffe.jsonl",
+      "sha256": "1971fdf351a47b254d1f8e755b21dbe767911931c8ffdaffd9847fe4105291f8",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00db2-ca93-775a-893a-b84923271d95",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T03-10-16-211Z_01a00db2-ca93-775a-893a-b84923271d95.jsonl",
+      "sha256": "df1c3b6ff74b4513f36177e5d477c35e516344bc636710d6d3821f0f7668ee37",
+      "user_turns": 2,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d95-e9df-7041-bfae-4df18c4d3095",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T02-38-43-679Z_01a00d95-e9df-7041-bfae-4df18c4d3095.jsonl",
+      "sha256": "5803d44cc37cb4f0aff15f1fc153f2eb89df6730cebb3b81cfb7ba2987fdfe06",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00db4-7ebf-71e1-bde5-00b453d99d70",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T03-12-07-871Z_01a00db4-7ebf-71e1-bde5-00b453d99d70.jsonl",
+      "sha256": "195181e11b00ab746dc8c45a6ef108a691c4f747ba2dc453dd6cba9318f92347",
+      "user_turns": 2,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a01226-e6b0-7af1-b4af-d5938285f6c9",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T23-55-34-448Z_01a01226-e6b0-7af1-b4af-d5938285f6c9.jsonl",
+      "sha256": "0a93efd982075555a520fe220f18b5a029da5f6b8ef00300177ca180ede43f3c",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d6f-3260-7169-a6aa-7e03d3f8e452",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T01-56-26-337Z_01a00d6f-3260-7169-a6aa-7e03d3f8e452.jsonl",
+      "sha256": "129d31b521a988f08c757b9e8c3d231bec79cf5a79ee9e83b683893cd6ceb8e7",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "01a00d9f-0e6e-76f5-9a4b-774b861e27ff",
+      "project": "patchbay-go",
+      "session_file": "2026-08-17T02-48-42-862Z_01a00d9f-0e6e-76f5-9a4b-774b861e27ff.jsonl",
+      "sha256": "915f009b5fb4d2ba7ab5d85dc90103546789068d48917e0c71760c1fc5f7a7c9",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019ffc9c-8c69-7511-a9b6-4585e29e6a30",
+      "project": "pink-lady-apple",
+      "session_file": "2026-08-13T19-32-25-833Z_019ffc9c-8c69-7511-a9b6-4585e29e6a30.jsonl",
+      "sha256": "c0f3f4893fc3d2e11924bd7fa2d2cd901b22badd0608cf0d69045115e5af0ad2",
+      "user_turns": 4,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019ffc9b-b876-7ff2-8fb8-00625873b219",
+      "project": "pink-lady-apple",
+      "session_file": "2026-08-13T19-31-31-574Z_019ffc9b-b876-7ff2-8fb8-00625873b219.jsonl",
+      "sha256": "cef5789a862ce65e7880f22763cca79aa5fec827d0b1d1f3fcdec2641123d8a2",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f23bf-97eb-7585-a7d7-f4554afd97f8",
+      "project": "podwash",
+      "session_file": "2026-07-02T16-53-06-667Z_019f23bf-97eb-7585-a7d7-f4554afd97f8.jsonl",
+      "sha256": "e94dead241f890a4f39f58090dc58eba50ed2a0762fb80dae7c02c901d178b85",
+      "user_turns": 2,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f0fa9-7ac7-7587-864c-a772afdf3e42",
+      "project": "model-output-protocol",
+      "session_file": "2026-06-28T19-16-33-095Z_019f0fa9-7ac7-7587-864c-a772afdf3e42.jsonl",
+      "sha256": "636d915e32116bace09948077cb69f431b7acb1583f4fea197903fa531681359",
+      "user_turns": 6,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f0ef4-fa6a-73ba-9655-ef637a54824c",
+      "project": "russ",
+      "session_file": "2026-06-28T15-59-23-754Z_019f0ef4-fa6a-73ba-9655-ef637a54824c.jsonl",
+      "sha256": "eb5f6337b7d8af3da1bf8c8ea28a91d276786ced3399da975d9f77934907103d",
+      "user_turns": 2,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f32ed-cc67-75ce-8aa8-eed26c1f55fd",
+      "project": "russ",
+      "session_file": "2026-07-05T15-37-53-000Z_019f32ed-cc67-75ce-8aa8-eed26c1f55fd.jsonl",
+      "sha256": "d891c5b62d21a97aea37aac66d0cdc6bf978243c678818cef3fc4cd0f623f039",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f1083-1a16-754f-9450-f445841a46e5",
+      "project": "patchbay-relay",
+      "session_file": "2026-06-28T23-14-15-190Z_019f1083-1a16-754f-9450-f445841a46e5.jsonl",
+      "sha256": "fa8b6d7eb6538117e8aa13b5814e822b9344863f3a3f95a8d3333d19dddc2188",
+      "user_turns": 5,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f18c0-6abe-78bc-a7e3-1968548d53f2",
+      "project": "patchbay-voice",
+      "session_file": "2026-06-30T13-38-11-262Z_019f18c0-6abe-78bc-a7e3-1968548d53f2.jsonl",
+      "sha256": "c8f0b1ee62c2582339d707b80be96e1b729c369e86682fb196f08d99d4b69ff9",
+      "user_turns": 5,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f1b91-2aa4-77c2-9ad6-62ef84252bec",
+      "project": "patchbay-voice",
+      "session_file": "2026-07-01T02-45-26-308Z_019f1b91-2aa4-77c2-9ad6-62ef84252bec.jsonl",
+      "sha256": "3f35fb4efef9dcc393842bf80b2cd4f88fefe5083e97107fbd0020cdf45d6b17",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f1b58-3dab-77d5-84e3-94f92dc54570",
+      "project": "patchbay-voice",
+      "session_file": "2026-07-01T01-43-15-627Z_019f1b58-3dab-77d5-84e3-94f92dc54570.jsonl",
+      "sha256": "ec95dfe5b2f7bf347a9641f0acbf34e766fe7bc304acd69d8fb0352ad3093e2c",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f1fd5-9ac9-7534-b0c7-fc5bf012efa3",
+      "project": "patchbay-voice",
+      "session_file": "2026-07-01T22-38-40-329Z_019f1fd5-9ac9-7534-b0c7-fc5bf012efa3.jsonl",
+      "sha256": "c81668d009b422981fa585972ca3ff80a06db296a5d3db4346e75194cab2f494",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f1b57-64a4-70a4-a016-45905f0baf7b",
+      "project": "patchbay-voice",
+      "session_file": "2026-07-01T01-42-20-068Z_019f1b57-64a4-70a4-a016-45905f0baf7b.jsonl",
+      "sha256": "a9372dc265babe0239c1ff1eabea1711980c83132a8660a5a0430ab31a3c55f2",
+      "user_turns": 5,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f1fe9-6af6-7350-a7fa-12e651f38230",
+      "project": "patchbay-voice",
+      "session_file": "2026-07-01T23-00-18-806Z_019f1fe9-6af6-7350-a7fa-12e651f38230.jsonl",
+      "sha256": "944fef62cbafa25b371b7ea5346ec5f1934cbf2ab220acf8f6076d0faa6ced96",
+      "user_turns": 10,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f1fdf-a3c9-7185-b808-fedb10517640",
+      "project": "patchbay-voice",
+      "session_file": "2026-07-01T22-49-37-993Z_019f1fdf-a3c9-7185-b808-fedb10517640.jsonl",
+      "sha256": "3239dbe92a5331e7f188ab742a593f9c914c85ed0abe3858a0c5fb12f2a3d65e",
+      "user_turns": 3,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f2a36-91e4-73d8-8d49-bb474107d2b9",
+      "project": "patchbay-voice",
+      "session_file": "2026-07-03T23-00-47-204Z_019f2a36-91e4-73d8-8d49-bb474107d2b9.jsonl",
+      "sha256": "e4a10cd93c7adedaf2345d51cb77b0b80daabf294ec37db744dbcaf5b27d6439",
+      "user_turns": 5,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019f3545-2436-78f8-ae1d-43fb7891d075",
+      "project": "patchbay-voice",
+      "session_file": "2026-07-06T02-32-31-543Z_019f3545-2436-78f8-ae1d-43fb7891d075.jsonl",
+      "sha256": "a6a7c24f1b416077e462034eaf5133dd9e7bb62cb62bd46bdb1f6a28dfbf64a9",
+      "user_turns": 1,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    },
+    {
+      "session_id": "019ffc8a-b4c2-7408-b78e-57e9a9e8fa62",
+      "project": "patchbay-voice",
+      "session_file": "2026-08-13T19-12-56-514Z_019ffc8a-b4c2-7408-b78e-57e9a9e8fa62.jsonl",
+      "sha256": "3c24b5c7a2cff14f4ee0e32b98c8cc4855f33add0048fbab77360245d891bea1",
+      "user_turns": 2,
+      "review": "User and visible assistant text read; repetitive demos grouped rather than promoted separately."
+    }
+  ]
+}

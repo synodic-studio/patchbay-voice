@@ -1,0 +1,26 @@
+{
+  "observation_id": "019f1fe9-6af6-7350-a7fa-12e651f38230:14",
+  "status": "candidate",
+  "source": {
+    "session_file": "2026-07-01T23-00-18-806Z_019f1fe9-6af6-7350-a7fa-12e651f38230.jsonl",
+    "project": "patchbay-voice",
+    "session_sha256": "944fef62cbafa25b371b7ea5346ec5f1934cbf2ab220acf8f6076d0faa6ced96"
+  },
+  "messages": [
+    {
+      "line": 14,
+      "timestamp": "2026-07-03T17:01:34.354Z",
+      "role": "user",
+      "text": "Yeah, it seems like it's working well. Let's take a couple of notes while we're here, though. I'm noticing that when I hold my finger on the mic button that the added border pushes the bottom toolbar up a little bit. So we will want to fix that jumpiness. And I saw on the menu for the text of speech that it says Google Cloud. And I don't know. I think we should consider whether that is the right terminology or not. And then... The last thing is... I forgot what I was going to say. Oh, yeah. I want us to look into the practicality of making this a published app, but also requiring an install on someone's computer. Are there common patterns for that? And that's totally normal or what barriers might there be between us, publishing this and not. The first two things save to the Patchbay notes, but the other one, let's chat about it here."
+    },
+    {
+      "line": 19,
+      "timestamp": "2026-07-03T17:01:42.807Z",
+      "role": "assistant",
+      "text": "I saved those first two notes. Now for the third question about publishing an app that requires a server install on someone's computer — that is a totally normal pattern. It's often called a self-hosted or on-premise deployment. Think of things like Homebridge, Plex, or Obsidian with its sync server.\n\nThe common approaches are a companion desktop app that bundles a lightweight server, a Docker image for easy setup, or a CLI tool that manages the server process. The main barriers are making the install experience smooth enough for non-technical users and handling updates gracefully. But if your target audience is developers or tech-enthusiasts, it's very straightforward.\n\nWhat kind of install experience are you imagining for this?"
+    }
+  ],
+  "rationale": "Save only the two requested UX notes; discuss distribution in speech.",
+  "promotion_requirements": "Needs a multi-turn replay or independently curated minimal project fixture.",
+  "label_source": "codex review at user request"
+}

@@ -1,0 +1,62 @@
+{
+  "observation_id": "019f2a36-91e4-73d8-8d49-bb474107d2b9:52",
+  "status": "candidate",
+  "source": {
+    "session_file": "2026-07-03T23-00-47-204Z_019f2a36-91e4-73d8-8d49-bb474107d2b9.jsonl",
+    "project": "patchbay-voice",
+    "session_sha256": "e4a10cd93c7adedaf2345d51cb77b0b80daabf294ec37db744dbcaf5b27d6439"
+  },
+  "messages": [
+    {
+      "line": 52,
+      "timestamp": "2026-07-03T23:02:23.739Z",
+      "role": "user",
+      "text": "Tell me how pb voice auto commit works. When? Branch name?"
+    },
+    {
+      "line": 99,
+      "timestamp": "2026-07-03T23:03:16.668Z",
+      "role": "assistant",
+      "text": "There is no auto-commit feature in Patchbay Voice. Here's the relevant design:\n\n1. **pi is locked down** — the system prompt in `server/pi_runner.py` explicitly says *\"Do not use git tools to stage, commit, or push changes\"* and *\"Do not proactively create documents to convey information — speak instead.\"*\n\n2. **The only save mechanism** is the `write_file` tool in `pi/tools.ts`, which writes to `docs/patchbay/` inside the project dir. This is how pi saves plans, notes, or output you explicitly ask for. It's a manual write, not an auto-commit.\n\n3. **No cron/launchd watcher** — nothing watches `docs/patchbay/` and auto-commits. No beads sync is wired up for auto-commit either (beads sync-branch is commented out in config).\n\n4. **Session persistence** is handled separately by the Telegram relay (`patchbay/sessions.py`) — it saves the pi session ID to a JSON file so context survives across turns. No git involved.\n\n5. **The old \"Claude will run\" text** you had me fix was just a status message in `/setproject` — not describing any auto-commit behavior.\n\nWhat did you *want* auto-commit to do? Like — after pi writes a file to `docs/patchbay/`, should the relay auto-commit + push it to a branch? If so, what branch naming scheme?"
+    },
+    {
+      "line": 100,
+      "timestamp": "2026-07-03T23:04:58.826Z",
+      "role": "user",
+      "text": "There is a menu item in the pbv menu for auto commit so i thought  that was a feature not a no-op"
+    },
+    {
+      "line": 108,
+      "timestamp": "2026-07-03T23:05:14.789Z",
+      "role": "assistant",
+      "text": "It is a real feature — you were right to expect it to work. Here's how it works:\n\n**When:** Every pi turn, right after the LLM responds, before TTS. Controlled by the iOS toggle \"Auto-commit to Git\" → sends `auto_commit=true` to the server.\n\n**What it does (server `_git_commit` in `routes/talk.py`):**\n1. `git add -- docs/patchbay/` — stages changes in the save directory\n2. `git diff --cached --quiet` — checks if anything actually changed\n3. If so: `git commit -m \"voice: save notes\" -- docs/patchbay/` — commits only that pathspec\n\n**Branch name:** Whatever branch the project is currently on (main, develop, etc.). There is no dedicated auto-commit branch — it commits directly to the checked-out branch.\n\n**Not default:** Toggle is off by default (`autoCommitEnabled = false` in settings). You flip it on per-project when you want pi's saved files tracked.\n\n**Failure handling:** Errors are caught and logged to stderr. They never crash the server or the turn — your reply still comes through. There's no push — it commits locally and leaves the push to you."
+    },
+    {
+      "line": 109,
+      "timestamp": "2026-07-03T23:07:47.416Z",
+      "role": "user",
+      "text": "Why did you initially lie to me? Are agents docs or readme old? I think the auto commits should go to branch called “patchbay” and ideally don’t switch to it. Or maybe one toggle for auto-commit and then if that is on then option to use current branch or custom branch that defaults to “patchbay” but is configurable. I think commits should if possible be done without switching branches."
+    },
+    {
+      "line": 110,
+      "timestamp": "2026-07-03T23:07:59.780Z",
+      "role": "assistant",
+      "text": "You're right — my bad. I searched the relay project first and stopped when I found nothing, then didn't look in the iOS SwiftUI code or server tests until you called me on it. The feature was there the whole time in `ios/` and `server/routes/talk.py`. I'll read more broadly next time.\n\nHere's the plan for the branch behavior:\n\n**Commit to `patchbay` branch without switching:**\n\nUse `git write-tree` + `git commit-tree` plumbing — creates commits on any branch without ever touching HEAD or the working tree. If the branch doesn't exist yet, it's created from the current HEAD. Then unstage from the working branch.\n\n**Configurable branch name:**\n- Default: `patchbay`\n- Editable in iOS Settings (text field below the toggle)\n- Sent as `auto_commit_branch` form field\n\nLet me implement both sides:"
+    },
+    {
+      "line": 133,
+      "timestamp": "2026-07-03T23:13:15.100Z",
+      "role": "user",
+      "text": "Isn’t our cwd for voice though? Why would you search relay first?"
+    },
+    {
+      "line": 134,
+      "timestamp": "2026-07-03T23:13:19.993Z",
+      "role": "assistant",
+      "text": "You're right, I had no excuse. This session's cwd is `patchbay-voice`, and you said \"pb voice\" in the question. I should have searched `server/` and `ios/` and `scripts/` in `patchbay-voice` first — not default to the relay project.\n\nThe relay is a different system (Telegram bot → Claude/pi sessions). Voice is a separate server + iOS app. Same developer, different codebases. I conflated them and missed the obvious hit in the iOS Swift code and server route handler. Won't happen again."
+    }
+  ],
+  "rationale": "Agent confused Voice with Relay and denied an existing auto-commit feature.",
+  "promotion_requirements": "Development conversation rather than confirmed restricted voice runtime; needs historical source fixtures.",
+  "label_source": "codex review at user request"
+}
