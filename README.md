@@ -10,22 +10,24 @@ Voice interface to your codebase, powered by [pi](https://github.com/earendil-wo
   <img src="docs/screenshots/settings.png" width="30%" alt="Settings: model, voice, and server" />
 </p>
 
+Product behavior and limitations: [product specification](docs/product-spec.md). Proposed hands-free mode: [continuous-voice research](docs/continuous-voice-research.md).
+
 ## What it is
 
 A two-part system: an iOS app and a server that runs alongside pi on a machine you control (macOS or Linux, local or remote).
 
-You hold a button and ask about a project: what it does, how a piece works, what changed in the last commit. The server transcribes it with faster-whisper, sends it to pi (via a custom extension bundled in the repo), and streams the spoken answer back. The agent can read files, search, and inspect git history, and it can save notes to a locked folder in the repo, but it does not modify your code. The whole exchange is stored per-session so context accumulates across turns.
+You hold a button and ask about a project: what it does, how a piece works, what changed in the last commit. The server transcribes it with faster-whisper, sends it to pi (via a custom extension bundled in the repo), and returns the answer with audio files for playback. The agent can read files, search, and inspect git history, and it can save notes to a locked folder in the repo, but it does not modify your code. The whole exchange is stored per-session so context accumulates across turns.
 
 Two clients ship with the repo: a native iOS app and a single-file web client served directly by the server at `GET /`. Both share the same API.
 
-## Design: a turn always comes back with something audible
+## Design: audible responses with fallback behavior
 
-A voice interface is used when you are *not* looking at the screen: walking, hands busy, phone in a pocket. That single fact changes what a failure is allowed to do: a silent app leaves you waiting on the sidewalk for a reply that never comes, with no way to tell it broke. So the server is built on one rule: **every turn returns something you can hear.** The decisions that follow from it were easy to leave implicit until voice forced them, so they are written down as [architecture decision records](docs/adr/) and tested against, not buried in the code:
+A voice interface is used when you are *not* looking at the screen: walking, hands busy, phone in a pocket. That single fact changes what a failure is allowed to do: a silent app leaves you waiting on the sidewalk for a reply that never comes, with no way to tell it broke. The intended rule is that **a turn produces an audible response when audio is enabled**. Supported synthesis and agent failures have fallback paths; network loss, permissions and audio routing still limit what can be guaranteed. The decisions that follow from it were easy to leave implicit until voice forced them, so they are written down as [architecture decision records](docs/adr/) and tested against, not buried in the code:
 
 - **[Audio is best-effort, never required](docs/adr/0001-tts-fallback-chain.md).** The transcript and reply text are the permanent record; spoken audio is a disposable rendering. Synthesis runs a one-way fallback chain (Google Cloud TTS → local `say`/`espeak`/`piper` → a pre-recorded "audio unavailable" clip) and flags when it had to fall back.
 - **[Failures speak](docs/adr/0003-failed-turn-persistence-and-audio.md).** If pi times out or transcription fails, the turn is still saved and a short spoken notice comes back through that same chain. The technical detail stays in the turn's text; what you *hear* is a plain sentence.
-- **[Nothing you say is dropped](docs/adr/0002-turn-submission-queue.md).** Talking while a previous turn is still running used to block or discard the earlier message. Now every submission is queued server-side in strict FIFO order and answered as its own turn.
-- **[Audio is ephemeral on purpose](docs/adr/0005-audio-lifetime.md).** A turn's audio lives only until the next turn on that chat, then it's deleted. This is a live conversation, not a podcast archive.
+- **[Overlapping turns are serialized](docs/adr/0002-turn-submission-queue.md).** Requests on the same chat wait on an in-memory server lock and are processed separately. This is not a durable queue; process loss and delivery recovery remain limitations.
+- **[Audio is ephemeral on purpose](docs/adr/0005-audio-lifetime.md).** Known audio files are deleted on the next turn in that chat; tracking across server restarts remains incomplete. This is a live conversation, not a podcast archive.
 
 ## Architecture
 
@@ -36,7 +38,7 @@ iOS app or web client (GET / → web/index.html)
             ├── faster-whisper (local transcription)
             ├── pi --print --mode json --session <id> --extension pi/tools.ts
             └── Google Cloud TTS or macOS say (audio response)
-                └── Audio chunks streamed back to client
+                └── Completed audio file URLs returned to client
 ```
 
 Sessions map one-to-one to directories under `~/Developer`. Each session carries a pi session ID so pi maintains context across turns.
@@ -55,7 +57,7 @@ Sessions map one-to-one to directories under `~/Developer`. Each session carries
 ```bash
 cd server
 uv sync
-uv run uvicorn app:app
+uv run uvicorn app:app --host 127.0.0.1 --port 31552
 ```
 
 Or use the convenience wrapper:
@@ -127,7 +129,7 @@ Run `patchbay-voice qr` on the server to print a setup QR that encodes the serve
 Auth is off by default. On a loopback or Tailscale-only bind, the network is the boundary. If you expose the server more widely, set a shared token:
 
 ```bash
-VOICE_AUTH_TOKEN=<token> uv run uvicorn app:app        # repo checkout
+VOICE_AUTH_TOKEN=<token> uv run uvicorn app:app --port 31552 # repo checkout
 launchctl setenv VOICE_AUTH_TOKEN <token> && \
   brew services restart patchbay-voice-server           # brew service
 ```
@@ -173,8 +175,9 @@ A single-file HTML/JS/CSS app at `web/index.html`, served by the server at `GET 
 Built with SwiftUI, targeting iOS 17+. Managed with [Tuist](https://tuist.io).
 
 ```bash
+cd ios
 tuist generate --no-open
-# then open PatchbayVoice.xcworkspace and run on device
+tuist xcodebuild build -workspace PatchbayVoice.xcworkspace -scheme PatchbayVoice -destination 'generic/platform=iOS Simulator'
 ```
 
 Ships to TestFlight via Fastlane:
@@ -190,13 +193,15 @@ fastlane beta         # build + upload + add to internal testers
 - **TTS responses**: spoken replies via Google Cloud, macOS `say`, or the local `espeak`/`piper` engines, toggleable per-session
 - **Speaking rate**: adjustable 0.5×–2.0× slider in Settings, applied to both providers
 - **Sessions**: one per repo, persisted across app launches; swipe to reset or delete
-- **Turn history**: stored locally in UserDefaults until you reset the session
+- **Turn history**: stored on the server, fetched on open, and cached locally until reset
 - **Write directory**: server constrains pi to a single save path per project
 - **Auto-commit / auto-push**: optionally commit and push saved notes to a side branch, each toggle enabled only when the repo actually supports it (a Git repo for commit, a remote for push), so neither is ever a silent no-op
 - **Dark graphite UI**: designed around the Patchbay Voice design system (1A Graphite)
 - **Model switching**: any LiteLLM alias, switchable from Settings
 
 ## Demo
+
+Two subtitle-first review videos can be captured and rendered with [demo/video](demo/video/README.md). See the [product spec](docs/product-spec.md) and [launch-readiness packet](docs/launch-readiness.md) for current behavior and public-demo limitations.
 
 `scripts/demo.sh` narrates a live turn from the terminal: the hardened pi invocation and the twelve tools it is left with, the tool calls streaming out of the server log while the agent works, and the branch it pushed afterward. Ask the question from the phone, or pass `--drive` to ask it over the API.
 
@@ -213,10 +218,10 @@ It reads tool calls from the server's log (`~/Library/Logs/patchbay-voice-server
 
 ```bash
 ./scripts/test.sh                   # all non-iOS suites (brew wrapper + server + pi)
-cd server && uv run pytest          # 150 server tests
+cd server && uv run pytest          # server tests
 node --test pi/tools.test.mts       # pi extension regression suite
 bash brew/tests/discover-urls.test.sh   # brew CLI wrapper (survives a failing interface probe)
-cd ios && tuist test                # iOS unit + UI tests
+cd ios && tuist xcodebuild test -workspace PatchbayVoice.xcworkspace -scheme PatchbayVoice -destination 'platform=iOS Simulator,name=iPhone 17 Pro' # choose an installed simulator
 ```
 
 `scripts/test.sh` is the gate: it's run by `.githooks/pre-push`, which blocks a

@@ -1,5 +1,7 @@
 # Scope and boundary: where Patchbay Voice stops
 
+For current implementation limits and acceptance evidence, see [the product specification](product-spec.md). The invariants below describe intended product boundaries; they do not establish durable delivery, background-audio reliability, or zero-cloud data flow for every deployment.
+
 This document is the stopping rule for Patchbay Voice: the invariants that define it, a one-line test for any proposed feature, and the canonical boundary with its sibling product, Patchbay Relay. Section 4 is written to be lifted whole into Relay's own docs.
 
 ## 1. The product, and the fence around it
@@ -21,7 +23,7 @@ Reason: voice cannot afford navigation. Picking a thread aloud is friction the m
 Reason: this is a live conversation, not a podcast archive (ADR 0005). Transcript and reply text are the permanent record; a turn's audio survives only until the chat's next turn. Any feature that wants to keep, browse, or export audio is arguing with the product's identity.
 
 **5. Runs on a machine you control.**
-Reason: the whole value is real access to your real code, and that access must never route through someone else's box. The server runs beside pi on your own macOS/Linux host, binds loopback by default, uses the network (or an optional bearer token) as the boundary, and can run with zero external accounts at all via local whisper, local TTS, and the local-LLM option (README; `scripts/enable-local-llm.sh`).
+Reason: the whole value is real access to your real code, while the owner chooses where inference runs. Cloud inference can receive prompts and tool content; owned-host execution is not a zero-cloud guarantee. The server runs beside pi on your own macOS/Linux host, binds loopback by default, uses the network (or an optional bearer token) as the boundary, and can run with zero external accounts at all via local whisper, local TTS, and the local-LLM option (README; `scripts/enable-local-llm.sh`).
 
 ## 2. The test
 

@@ -65,6 +65,8 @@ extension TalkView {
                 textInputMode
             } else {
                 iconButton(icon: "keyboard") { showTextInput = true }
+                    .accessibilityLabel("Type a message")
+                    .accessibilityIdentifier("text-mode-btn")
                 Spacer()
                 TalkButtonView(viewModel: viewModel)
                 Spacer()
@@ -77,7 +79,10 @@ extension TalkView {
         iconButton(icon: "mic") { showTextInput = false
             textInput = ""
         }
+        .accessibilityLabel("Use microphone")
+        .accessibilityIdentifier("voice-mode-btn")
         TextField("Type a message…", text: $textInput, axis: .vertical)
+            .accessibilityIdentifier("message-input")
             .lineLimit(1 ... 4)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -92,6 +97,8 @@ extension TalkView {
             icon: "arrow.up",
             active: !textInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
         ) { submitText() }
+            .accessibilityLabel("Send message")
+            .accessibilityIdentifier("send-message-btn")
             .disabled(textInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 

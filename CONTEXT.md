@@ -9,7 +9,7 @@ The single, ongoing, cumulative conversation for one project directory — at mo
 _Avoid_: session (ambiguous with pi's own session — say "chat" for our object, "pi session" for pi's)
 
 **Turn**:
-One exchange in a chat: a user's transcript paired with the assistant's reply. Audio is a best-effort, ephemeral rendering of the reply — never a requirement for the turn to exist or be delivered, and never kept beyond the chat's next turn (see docs/adr/0005). The transcript and reply text are the permanent record; audio is not.
+One exchange in a chat: a user's transcript paired with the assistant's reply. Audio is a best-effort, ephemeral rendering of the reply — never a requirement for the turn to exist or be delivered, with known files evicted on the chat's next turn; cross-restart cleanup remains incomplete (see docs/adr/0005 and docs/product-spec.md). The transcript and reply text are the permanent record; audio is not.
 _Avoid_: message, exchange, request
 
 **Degraded turn**:
@@ -17,11 +17,11 @@ A turn whose reply audio could not be synthesized by any provider, so a canned s
 _Avoid_: failed turn, broken turn
 
 **Failed turn**:
-A turn where no reply was ever produced — pi timing out, crashing, or erroring, or transcription itself failing before pi is even reached. If a transcript exists, it's persisted (what the user said is never silently lost); if transcription itself failed, the transcript field holds a placeholder instead, since there are no real words to show. Either way, a short, fixed, generic notice is spoken through the same fallback chain as any other reply. Distinct from a `Degraded turn`, which has a complete, correct reply and only lost the ability to speak it — a Failed turn has no real reply to show, only the technical detail kept in its text for later debugging.
+A turn where no reply was ever produced — pi timing out, crashing, or erroring, or transcription itself failing before pi is even reached. If a transcript exists, it's persisted (what the user said is never silently lost); if transcription itself failed, the transcript field holds a placeholder instead, since there are no real words to show. Either way, a short, fixed, generic notice is spoken through the same fallback chain as any other reply. Distinct from a `Degraded turn`, which has a complete reply and only lost the ability to speak it — a Failed turn has no real reply to show, only the technical detail kept in its text for later debugging.
 _Avoid_: error turn, degraded turn (these are not the same thing)
 
 **Queued turn**:
-A turn submitted while another turn on the same chat is still being processed. Held server-side in strict submission order and processed as its own independent turn once the chat is free — never dropped, never merged with another turn (grouping queued turns into one combined turn is a possible future mode, not the current behavior).
+A turn submitted while another turn on the same chat is still being processed. Held behind an in-memory per-chat lock and processed as its own independent turn once the chat is free. This is not a durable inbox and does not establish delivery across process loss; turns are not merged with another turn (grouping queued turns into one combined turn is a possible future mode, not the current behavior).
 _Avoid_: pending message, backlog
 
 **Steer** _(not yet implemented — considered and deferred, see docs/adr/0002)_:

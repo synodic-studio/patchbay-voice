@@ -1,0 +1,72 @@
+{
+  "capture": {
+    "source_revision": "796fe5bd856a6ad8f8d4351c42cb8fd04a97b8c0",
+    "voice_revision": "aa9b36635973446d112eee95a97467083a109da3",
+    "source_hashes": {
+      "README.md": "d43c749578c4869fdc7184cb573d6830bbb1010b363d0008f3abc96d1e3053d6",
+      "src/worker.js": "7d94fbc20262a94098fde73bacc70fa0dcd0ea3216e65145edfdfbf164479013",
+      "src/worker.test.js": "cf543348acb7bfccbbddb472eac2bfffb867674c472a54482d4fe8faaaf71285"
+    },
+    "prompts": [
+      "Read src/worker.js. In this repository, what does the raw route refuse, and how does a valid link open its app? Keep it to two short sentences.",
+      "Save those rules as a concise contributor note called raw-route.md. Include the rejection status code and the redirect mechanism. Keep your spoken reply to one sentence."
+    ],
+    "model": "litellm/small",
+    "input": "typed in the real iOS simulator",
+    "audio": "server say; final review videos muted",
+    "remote": "isolated local bare git repository",
+    "device": "F2CA4CF3-384E-49D8-BB89-37C55C592192",
+    "recording_started_at": 1789319152.758729,
+    "test_teardown": "UI capture completed; toolchain teardown exceeded grace period",
+    "notes_commit": "81b1d8fe279074307481a9a5e6987cbad9380d8e",
+    "note_sha256": "7c339765c0e50089190e912a3055e9c91e288c0e11a64679d202a3b5c49a88d8",
+    "verified": true,
+    "source_unchanged": true,
+    "working_branch": "develop",
+    "recording_startup_offset_seconds": 1.356253910064698,
+    "alignment_method": "Two input screenshot anchors, 5fps image matching; approximate editorial synchronization"
+  },
+  "videos": {
+    "product": {
+      "duration": 66.0,
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "captions": 6,
+      "sha256": "cbf19f8ffbcb7acbb1fa827ef46063551f33c250a3c8680a55c1aed22d222c62",
+      "decode": "passed",
+      "visual_review": "Passed: all scene contact frames inspected; full-size persistence and event frames checked after correcting startup alignment and using actual screenshot holds."
+    },
+    "engineering": {
+      "duration": 97.433333,
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "captions": 8,
+      "sha256": "63881af2732891fd5f1aa86d576033bcbd833082a9cd04d75e5ed8302a5386b4",
+      "decode": "passed",
+      "visual_review": "Passed: all scene contact frames inspected; full-size persistence and event frames checked after correcting startup alignment and using actual screenshot holds."
+    }
+  },
+  "checks": {
+    "server_tests": 164,
+    "pi_extension_tests": 6,
+    "brew_wrapper": "passed",
+    "swift_unit_tests": 32,
+    "capture_ui_tests": 1,
+    "ordinary_capture_test": "skipped as intended",
+    "ios_command_exit": "test suites passed; toolchain teardown hung and was stopped"
+  },
+  "live_events": [
+    {
+      "tool": "read_file",
+      "path": "src/worker.js"
+    },
+    {
+      "tool": "write_file",
+      "path": "docs/patchbay/raw-route.md"
+    }
+  ]
+}

@@ -23,3 +23,9 @@ scripts/demo.env
 # Live evaluation reports; curated baseline summaries are tracked separately.
 evals/results/
 __pycache__/
+
+# Reproducible video outputs and private capture runtime
+demo/video/runs/
+demo/video/output/
+
+demo/video/.venv/
